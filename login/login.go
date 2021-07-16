@@ -67,12 +67,14 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 
 	signedToken, err := auth.encryptJWT(uac, &uacInfo)
 	if err != nil {
+		log.Println(err)
 		notAuthWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}
 
 	session.Set(JWT_TOKEN_KEY, signedToken)
 	if err := session.Save(); err != nil {
+		log.Println(err)
 		notAuthWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}
