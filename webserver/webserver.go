@@ -15,5 +15,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	authController := &AuthController{}
 	authController.AddRoutes(httpRouter)
+	healthController := &HealthController{}
+	healthController.AddRoutes(httpRouter)
 	return httpRouter
 }
