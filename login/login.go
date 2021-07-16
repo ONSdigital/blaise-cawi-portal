@@ -2,6 +2,7 @@ package login
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -20,13 +21,30 @@ const (
 	ISSUER              = "social-surveys-web-portal"
 )
 
-var expirationTime = "2h"
+// var expirationTime = "2h"
+var expirationTime = "30s"
 
 type Auth struct {
 	JWTSecret string
-	UacURL    string
-	UacClient *http.Client
 	BusApi    busapi.BusApiInterface
+}
+
+func (auth *Auth) Authenticated(context *gin.Context) {
+	session := sessions.Default(context)
+	jwtToken := session.Get(JWT_TOKEN_KEY)
+
+	if jwtToken == nil {
+		notAuth(context)
+		return
+	}
+
+	_, err := auth.DecryptJWT(jwtToken)
+	if err != nil {
+		log.Println(err)
+		notAuth(context)
+		return
+	}
+	context.Next()
 }
 
 func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
@@ -79,27 +97,6 @@ func (auth *Auth) encryptJWT(uac string, uacInfo *busapi.UacInfo) (string, error
 	return token.SignedString([]byte(auth.JWTSecret))
 }
 
-func (auth *Auth) decryptJWT(context *gin.Context) (*UACClaims, error) {
-	session := sessions.Default(context)
-	jwtTokenKey := session.Get(JWT_TOKEN_KEY)
-
-	if jwtTokenKey == nil {
-		return nil, fmt.Errorf("No JWT Token in session")
-	}
-	token, err := jwt.ParseWithClaims(jwtTokenKey.(string), &UACClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(auth.JWTSecret), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := token.Claims.Valid(); err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	return token.Claims.(*UACClaims), nil
-}
-
 func (auth *Auth) DecryptJWT(jwtToken interface{}) (*UACClaims, error) {
 	if jwtToken == nil {
 		return nil, fmt.Errorf("No JWT Token in session")
@@ -111,7 +108,6 @@ func (auth *Auth) DecryptJWT(jwtToken interface{}) (*UACClaims, error) {
 		return nil, err
 	}
 	if err := token.Claims.Valid(); err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 

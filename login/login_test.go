@@ -24,8 +24,6 @@ var _ = Describe("Login", func() {
 		validUAC = "123456789012"
 		auth     = &login.Auth{
 			JWTSecret: "hello",
-			UacURL:    "http://localhost",
-			UacClient: &http.Client{},
 		}
 		httpRouter   *gin.Engine
 		httpRecorder *httptest.ResponseRecorder
