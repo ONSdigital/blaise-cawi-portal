@@ -14,10 +14,3 @@ TODO:
 Auth stuff:
 - CAWI urls authenticated for "instrument"
 - Start interview authenticated for "instrument" and "caseID" (KeyValue)
-
-
-Where to start ? 
-At the beginning, of the end?
-I cant think anymore
-
-I guess just getting the login page to render from a template?
