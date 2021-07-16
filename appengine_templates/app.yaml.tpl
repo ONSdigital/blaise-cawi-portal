@@ -9,6 +9,7 @@ env_variables:
   JWT_SECRET: _JWT_SECRET
   SESSION_SECRET: _SESSION_SECRET
   ENCRYPTION_SECRET: _ENCRYPTION_SECRET
+  GIN_MODE: release
 
 vpc_access_connector:
   name: projects/_PROJECT_ID/locations/europe-west2/connectors/vpcconnect
