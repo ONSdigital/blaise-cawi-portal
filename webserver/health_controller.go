@@ -16,7 +16,7 @@ type HealthController struct {
 
 func (healthController *HealthController) AddRoutes(httpRouter *gin.Engine) {
 	httpRouter.GET("/health", healthController.HealthEndpoint)
-	httpRouter.GET("/bus/:version/health", healthController.HealthEndpoint)
+	httpRouter.GET("/cawi-portal/:version/health", healthController.HealthEndpoint)
 }
 
 func (healthController *HealthController) HealthEndpoint(context *gin.Context) {
