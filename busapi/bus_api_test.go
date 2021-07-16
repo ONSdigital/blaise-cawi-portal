@@ -29,16 +29,32 @@ var _ = Describe("Getting a UAC from BUS", func() {
 	})
 
 	Describe("Get UAC Info", func() {
-		JustBeforeEach(func() {
-			httpmock.RegisterResponder("POST", fmt.Sprintf("%s/uacs/uac", baseUrl),
-				httpmock.NewJsonResponderOrPanic(200, busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}))
+		Context("when a uac is valid", func() {
+			JustBeforeEach(func() {
+				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/uacs/uac", baseUrl),
+					httpmock.NewJsonResponderOrPanic(200, busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}))
+			})
+
+			It("Returns UAC Info for a valid UAC", func() {
+				uacInfo, err := busApi.GetUacInfo(uac)
+				Expect(err).To(BeNil())
+				Expect(uacInfo.InstrumentName).To(Equal("foo"))
+				Expect(uacInfo.CaseID).To(Equal("bar"))
+			})
 		})
 
-		It("Returns UAC Info for a valid UAC", func() {
-			uacInfo, err := busApi.GetUacInfo(uac)
-			Expect(err).To(BeNil())
-			Expect(uacInfo.InstrumentName).To(Equal("foo"))
-			Expect(uacInfo.CaseID).To(Equal("bar"))
+		Context("bad response is returned", func() {
+			JustBeforeEach(func() {
+				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/uacs/uac", baseUrl),
+					httpmock.NewJsonResponderOrPanic(500, "nil"))
+			})
+
+			It("Returns a an error and an empty uac info struct", func() {
+				uacInfo, err := busApi.GetUacInfo(uac)
+				Expect(err).To(MatchError("Unable To Unmarshal Json"))
+				Expect(uacInfo.InstrumentName).To(Equal(""))
+				Expect(uacInfo.CaseID).To(Equal(""))
+			})
 		})
 	})
 })

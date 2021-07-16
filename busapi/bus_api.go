@@ -8,8 +8,10 @@ import (
 	"net/http"
 )
 
-type busApiInterface interface {
-	GetUacInfo(string) UacInfo
+//Generate mocks by running "go generate ./..."
+//go:generate mockery --name BusApiInterface
+type BusApiInterface interface {
+	GetUacInfo(string) (UacInfo, error)
 }
 
 type BusApi struct {
@@ -49,7 +51,7 @@ func (busApi *BusApi) doGetUacInfo(uac string) (*http.Response, error) {
 	uacRequest := UACRequest{UAC: uac}
 	uacJSON, err := json.Marshal(uacRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Unable to Marshal error")
 	}
 
 	request, err := http.NewRequest("POST", busApi.getUACInfoUrl(),
@@ -66,14 +68,14 @@ func (busApi *BusApi) doGetUacInfo(uac string) (*http.Response, error) {
 func (busApi *BusApi) marshalUacResponse(response *http.Response) (UacInfo, error) {
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return UacInfo{}, err
+		return UacInfo{}, fmt.Errorf("Unable to read body")
 	}
 	defer response.Body.Close()
 
 	var uacInfo UacInfo
 	err = json.Unmarshal(body, &uacInfo)
 	if err != nil {
-		return UacInfo{}, err
+		return UacInfo{}, fmt.Errorf("Unable To Unmarshal Json")
 	}
 	return uacInfo, nil
 }

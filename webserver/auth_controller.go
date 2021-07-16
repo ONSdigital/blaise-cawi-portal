@@ -12,6 +12,7 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 	authGroup := httpRouter.Group("/auth")
 	{
 		authGroup.GET("/login", authController.LoginEndpoint)
+		//authGroup.POST("/login", auth.Login)
 	}
 }
 
