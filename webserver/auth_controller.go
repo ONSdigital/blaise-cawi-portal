@@ -9,7 +9,7 @@ import (
 )
 
 type AuthController struct {
-	Auth *authenticate.Auth
+	Auth authenticate.AuthInterface
 }
 
 func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
@@ -17,6 +17,7 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 	{
 		authGroup.GET("/login", authController.LoginEndpoint)
 		authGroup.POST("/login", authController.PostLoginEndpoint)
+		authGroup.GET("/logout", authController.LogoutEndpoint)
 	}
 }
 
@@ -28,4 +29,10 @@ func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
 	session := sessions.Default(context)
 
 	authController.Auth.Login(context, session)
+}
+
+func (authController *AuthController) LogoutEndpoint(context *gin.Context) {
+	session := sessions.Default(context)
+
+	authController.Auth.Logout(context, session)
 }
