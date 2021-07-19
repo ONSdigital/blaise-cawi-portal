@@ -1,31 +1,20 @@
 package main
 
-import "github.com/ONSdigital/blaise-cawi-portal/webserver"
+import (
+	"fmt"
+	"log"
 
-type Config struct {
-	SessionSecret    string `split_words:"true"`
-	EncryptionSecret string `split_words:"true"`
-	CawiURL          string `split_words:"true"`
-	JWTSecret        string `split_words:"true"`
-	UacURL           string `split_words:"true"`
-	UacClientID      string `split_words:"true"`
-}
+	"github.com/ONSdigital/blaise-cawi-portal/webserver"
+	"github.com/kelseyhightower/envconfig"
+)
 
 func main() {
-	// httpClient := &http.Client{}
-	// httpRouter := gin.Default()
+	config := &webserver.Config{}
+	if err := envconfig.Process("", config); err != nil {
+		log.Fatal(err.Error())
+	}
 
-	// var config Config
-	// if err := envconfig.Process("", &config); err != nil {
-	// 	log.Fatal(err.Error())
-	// }
-
-	// auth := &Auth{
-	// 	JWTSecret: config.JWTSecret,
-	// 	UacURL:    config.UacURL,
-	// 	UacClient: client,
-	// }
-	server := &webserver.Server{}
+	server := &webserver.Server{Config: config}
 	httpRouter := server.SetupRouter()
-	httpRouter.Run(":8080")
+	httpRouter.Run(fmt.Sprintf(":%s", config.Port))
 }

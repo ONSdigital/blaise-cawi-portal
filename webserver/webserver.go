@@ -3,6 +3,7 @@ package webserver
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
@@ -13,27 +14,40 @@ import (
 	"google.golang.org/api/idtoken"
 )
 
-type Server struct{}
+type Config struct {
+	SessionSecret    string `split_words:"true"`
+	EncryptionSecret string `split_words:"true"`
+	CatiUrl          string `split_words:"true"`
+	JWTSecret        string `split_words:"true"`
+	BusUrl           string `split_words:"true"`
+	BusClientId      string `split_words:"true"`
+	Port             string
+}
+
+type Server struct {
+	Config *Config
+}
 
 func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter := gin.Default()
+	httpClient := &http.Client{}
 
-	store := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")), []byte(os.Getenv("ENCRYPTION_SECRET")))
+	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
 	httpRouter.Use(sessions.Sessions("session", store))
 	//This router has access to all templates in the templates folder
 	httpRouter.AppEngine = true
 	httpRouter.LoadHTMLGlob("templates/*")
 
-	client, err := idtoken.NewClient(context.Background(), os.Getenv("BUS_CLIENT_ID"))
+	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientId)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	auth := &authenticate.Auth{
-		JWTSecret: os.Getenv("JWT_SECRET"),
+		JWTSecret: server.Config.JWTSecret,
 		BusApi: &busapi.BusApi{
-			BaseUrl: os.Getenv("BUS_URL"),
+			BaseUrl: server.Config.BusUrl,
 			Client:  client,
 		},
 	}
@@ -43,7 +57,9 @@ func (server *Server) SetupRouter() *gin.Engine {
 	}
 	authController.AddRoutes(httpRouter)
 	instrumentController := &InstrumentController{
-		Auth: auth,
+		Auth:       auth,
+		CatiUrl:    server.Config.CatiUrl,
+		HttpClient: httpClient,
 	}
 	instrumentController.AddRoutes(httpRouter)
 	healthController := &HealthController{}
