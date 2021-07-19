@@ -11,17 +11,26 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/kelseyhightower/envconfig"
 	"google.golang.org/api/idtoken"
 )
 
 type Config struct {
-	SessionSecret    string `split_words:"true"`
-	EncryptionSecret string `split_words:"true"`
-	CatiUrl          string `split_words:"true"`
-	JWTSecret        string `split_words:"true"`
-	BusUrl           string `split_words:"true"`
-	BusClientId      string `split_words:"true"`
-	Port             string
+	SessionSecret    string `required:"true" split_words:"true"`
+	EncryptionSecret string `required:"true" split_words:"true"`
+	CatiUrl          string `required:"true" split_words:"true"`
+	JWTSecret        string `required:"true" split_words:"true"`
+	BusUrl           string `required:"true" split_words:"true"`
+	BusClientId      string `required:"true" split_words:"true"`
+	Port             string `default:"8080"`
+}
+
+func LoadConfig() (*Config, error) {
+	var config Config
+	if err := envconfig.Process("", &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
 }
 
 type Server struct {
@@ -38,6 +47,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.AppEngine = true
 	httpRouter.LoadHTMLGlob("templates/*")
 
+	fmt.Println(server.Config)
 	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientId)
 	if err != nil {
 		fmt.Println(err)

@@ -5,12 +5,11 @@ import (
 	"log"
 
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
-	"github.com/kelseyhightower/envconfig"
 )
 
 func main() {
-	config := &webserver.Config{}
-	if err := envconfig.Process("", config); err != nil {
+	config, err := webserver.LoadConfig()
+	if err != nil {
 		log.Fatal(err.Error())
 	}
 
