@@ -85,7 +85,7 @@ var _ = Describe("Login", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `Enter a 12-character access code`))
+			Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
 		})
 	})
 
@@ -104,7 +104,7 @@ var _ = Describe("Login", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `Enter a 12-character access code`))
+			Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
 		})
 	})
 
@@ -123,7 +123,7 @@ var _ = Describe("Login", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `Enter an access code`))
+			Expect(strings.Contains(string(body), `Enter an access code`)).To(BeTrue())
 		})
 	})
 })

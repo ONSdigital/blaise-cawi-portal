@@ -60,31 +60,31 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	uac := context.PostForm("uac")
 
 	if uac == "" {
-		notAuthWithError(context, NO_ACCESS_CODE_ERR)
+		NotAuthWithError(context, NO_ACCESS_CODE_ERR)
 		return
 	}
 	if len(uac) <= 11 || len(uac) >= 13 {
-		notAuthWithError(context, INVALID_LENGTH_ERR)
+		NotAuthWithError(context, INVALID_LENGTH_ERR)
 		return
 	}
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
 	if err != nil || uacInfo.InstrumentName == "" || uacInfo.CaseID == "" {
-		notAuthWithError(context, NOT_RECOGNISED_ERR)
+		NotAuthWithError(context, NOT_RECOGNISED_ERR)
 		return
 	}
 
 	signedToken, err := auth.encryptJWT(uac, &uacInfo)
 	if err != nil {
 		log.Println(err)
-		notAuthWithError(context, INTERNAL_SERVER_ERR)
+		NotAuthWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}
 
 	session.Set(JWT_TOKEN_KEY, signedToken)
 	if err := session.Save(); err != nil {
 		log.Println(err)
-		notAuthWithError(context, INTERNAL_SERVER_ERR)
+		NotAuthWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}
 	context.Redirect(http.StatusMovedPermanently, fmt.Sprintf("/%s/", uacInfo.InstrumentName))
@@ -141,8 +141,13 @@ func notAuth(context *gin.Context) {
 	context.Abort()
 }
 
-func notAuthWithError(context *gin.Context, errorMessage string) {
+func NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{"error": errorMessage})
+	context.Abort()
+}
+
+func Forbidden(context *gin.Context) {
+	context.HTML(http.StatusForbidden, "access_denied.tmpl", gin.H{})
 	context.Abort()
 }
 
