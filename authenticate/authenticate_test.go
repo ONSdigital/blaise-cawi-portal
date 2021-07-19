@@ -127,3 +127,44 @@ var _ = Describe("Login", func() {
 		})
 	})
 })
+
+var _ = Describe("Logout", func() {
+	var (
+		httpRouter   *gin.Engine
+		httpRecorder *httptest.ResponseRecorder
+		session      sessions.Session
+		auth         = &authenticate.Auth{
+			JWTSecret: "hello",
+		}
+	)
+
+	BeforeEach(func() {
+		httpRouter = gin.Default()
+		httpRouter.LoadHTMLGlob("../templates/*")
+		store := cookie.NewStore([]byte("secret"))
+		httpRouter.Use(sessions.Sessions("mysession", store))
+		httpRouter.GET("/logout", func(context *gin.Context) {
+			session = sessions.Default(context)
+			session.Set("foobar", "fizzbuzz")
+			session.Save()
+			Expect(session.Get("foobar")).ToNot(BeNil())
+			auth.Logout(context, session)
+		})
+	})
+
+	Context("Logout of a session", func() {
+		JustBeforeEach(func() {
+			httpRecorder = httptest.NewRecorder()
+			req, _ := http.NewRequest("GET", "/logout", nil)
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			httpRouter.ServeHTTP(httpRecorder, req)
+		})
+
+		It("Clears the current session and renders the login page", func() {
+			Expect(session.Get("foobar")).To(BeNil())
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+		})
+	})
+})

@@ -24,6 +24,15 @@ const (
 // var expirationTime = "2h"
 var expirationTime = "30s"
 
+//Generate mocks by running "go generate ./..."
+//go:generate mockery --name AuthInterface
+type AuthInterface interface {
+	Authenticated(*gin.Context)
+	Login(*gin.Context, sessions.Session)
+	Logout(*gin.Context, sessions.Session)
+	DecryptJWT(interface{}) (*UACClaims, error)
+}
+
 type Auth struct {
 	JWTSecret string
 	BusApi    busapi.BusApiInterface
@@ -114,6 +123,17 @@ func (auth *Auth) DecryptJWT(jwtToken interface{}) (*UACClaims, error) {
 	}
 
 	return token.Claims.(*UACClaims), nil
+}
+
+func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
+	session.Clear()
+	err := session.Save()
+	if err != nil {
+		notAuth(context)
+		return
+	}
+	context.HTML(http.StatusOK, "login.tmpl", gin.H{})
+	context.Abort()
 }
 
 func notAuth(context *gin.Context) {
