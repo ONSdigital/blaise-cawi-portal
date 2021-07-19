@@ -2,7 +2,7 @@ service: cawi-portal
 runtime: go115
 
 env_variables:
-  BLAISE_BASE_URL: _BLAISE_BASE_URL
+  RESTAPI_URL: _RESTAPI_URL
   BUS_CLIENT_ID: _BUS_CLIENT_ID
   BUS_URL: _BUS_URL
   CATI_URL: _CATI_URL
