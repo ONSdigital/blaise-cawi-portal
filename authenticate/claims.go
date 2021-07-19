@@ -1,4 +1,4 @@
-package login
+package authenticate
 
 import (
 	"strings"

@@ -1,10 +1,10 @@
-package login_test
+package authenticate_test
 
 import (
 	"strings"
 
+	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
-	"github.com/ONSdigital/blaise-cawi-portal/login"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -16,7 +16,7 @@ var _ = Describe("Claims", func() {
 	var (
 		instrumentName = "foo"
 		caseID         = "bar"
-		claim          = &login.UACClaims{
+		claim          = &authenticate.UACClaims{
 			UAC: "0008901",
 			UacInfo: busapi.UacInfo{
 				InstrumentName: instrumentName,

@@ -1,4 +1,4 @@
-package login_test
+package authenticate_test
 
 import (
 	"net/http"
@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi/mocks"
-	"github.com/ONSdigital/blaise-cawi-portal/login"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -22,7 +22,7 @@ var _ = Describe("Login", func() {
 		shortUAC = "22222"
 		longUAC  = "1111222233334444"
 		validUAC = "123456789012"
-		auth     = &login.Auth{
+		auth     = &authenticate.Auth{
 			JWTSecret: "hello",
 		}
 		httpRouter   *gin.Engine
@@ -63,7 +63,7 @@ var _ = Describe("Login", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusMovedPermanently))
 			Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
 			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-			decryptedToken, _ := auth.DecryptJWT(session.Get(login.JWT_TOKEN_KEY))
+			decryptedToken, _ := auth.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
 			Expect(decryptedToken.UAC).To(Equal(validUAC))
 			Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
 			Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
