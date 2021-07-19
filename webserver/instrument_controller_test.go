@@ -1,18 +1,20 @@
 package webserver_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"io"
-	"bytes"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/jarcoal/httpmock"
 	. "github.com/onsi/ginkgo"
@@ -30,12 +32,14 @@ var _ = Describe("Open Case", func() {
 		responseInfo         = "hello"
 		mockAuth             *mocks.AuthInterface
 		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}}
-		requestBody      io.Reader
+		requestBody          io.Reader
 	)
 
 	BeforeEach(func() {
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
+		store := cookie.NewStore([]byte("secret"))
+		httpRouter.Use(sessions.Sessions("mysession", store))
 		instrumentController.AddRoutes(httpRouter)
 		httpmock.Activate()
 	})
@@ -196,7 +200,7 @@ var _ = Describe("Open Case", func() {
 				JustBeforeEach(func() {
 					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
 						httpmock.NewJsonResponderOrPanic(200, responseInfo))
-	
+
 					mockAuth = &mocks.AuthInterface{}
 					mockAuth.On("Authenticated", mock.Anything).Return()
 					mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
@@ -206,12 +210,12 @@ var _ = Describe("Open Case", func() {
 					instrumentController.Auth = mockAuth
 
 					requestBody = bytes.NewReader([]byte(`{"foo":"bar"}`))
-	
+
 					httpRecorder = httptest.NewRecorder()
 					req, _ := http.NewRequest("POST", fmt.Sprintf("/%s/fwibble", instrumentName), requestBody)
 					httpRouter.ServeHTTP(httpRecorder, req)
 				})
-	
+
 				It("Returns a 200 response and some data", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 					body := httpRecorder.Body.Bytes()
@@ -223,7 +227,7 @@ var _ = Describe("Open Case", func() {
 				JustBeforeEach(func() {
 					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/api/application/start_interview", catiUrl, instrumentName),
 						httpmock.NewJsonResponderOrPanic(200, responseInfo))
-	
+
 					mockAuth = &mocks.AuthInterface{}
 					mockAuth.On("Authenticated", mock.Anything).Return()
 					mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
@@ -239,12 +243,12 @@ var _ = Describe("Open Case", func() {
 							"LayoutSet": "CAWI-Web_Large"
 						}
 					}`, caseID)))
-	
+
 					httpRecorder = httptest.NewRecorder()
 					req, _ := http.NewRequest("POST", fmt.Sprintf("/%s/api/application/start_interview", instrumentName), requestBody)
 					httpRouter.ServeHTTP(httpRecorder, req)
 				})
-	
+
 				It("Returns a 200 response and some data", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 					body := httpRecorder.Body.Bytes()
