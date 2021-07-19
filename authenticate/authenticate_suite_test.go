@@ -1,4 +1,4 @@
-package login_test
+package authenticate_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestLogin(t *testing.T) {
+func TestAuthenticate(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Login Suite")
+	RunSpecs(t, "Authenticate Suite")
 }

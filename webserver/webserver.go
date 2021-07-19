@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
-	"github.com/ONSdigital/blaise-cawi-portal/login"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -30,7 +30,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 		os.Exit(1)
 	}
 
-	auth := &login.Auth{
+	auth := &authenticate.Auth{
 		JWTSecret: os.Getenv("JWT_SECRET"),
 		BusApi: &busapi.BusApi{
 			BaseUrl: os.Getenv("BUS_URL"),

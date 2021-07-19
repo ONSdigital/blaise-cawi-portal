@@ -3,12 +3,12 @@ package webserver
 import (
 	"net/http"
 
-	"github.com/ONSdigital/blaise-cawi-portal/login"
+	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/gin-gonic/gin"
 )
 
 type InstrumentController struct {
-	Auth *login.Auth
+	Auth *authenticate.Auth
 }
 
 func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engine) {
