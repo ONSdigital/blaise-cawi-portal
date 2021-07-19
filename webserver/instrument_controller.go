@@ -2,16 +2,17 @@ package webserver
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
-	"encoding/json"
-	"log"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -43,7 +44,7 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 			instrumentController.proxyGet(context)
 		})
 
-		instrumentRouter.POST("/*path", func(context *gin.Context){
+		instrumentRouter.POST("/*path", func(context *gin.Context) {
 			instrumentController.Auth.Authenticated(context)
 			instrumentController.proxyPost(context)
 		})
@@ -51,7 +52,9 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 }
 
 func (instrumentController *InstrumentController) openCase(context *gin.Context) {
-	uacClaim, err := instrumentController.Auth.DecryptJWT(context)
+	session := sessions.Default(context)
+	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
+	uacClaim, err := instrumentController.Auth.DecryptJWT(jwtToken)
 	if err != nil {
 		authenticate.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
 		return
@@ -91,7 +94,9 @@ func (instrumentController *InstrumentController) proxyGet(context *gin.Context)
 	path := context.Param("path")
 	resource := context.Param("resource")
 
-	uacClaim, err := instrumentController.Auth.DecryptJWT(context)
+	session := sessions.Default(context)
+	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
+	uacClaim, err := instrumentController.Auth.DecryptJWT(jwtToken)
 	if err != nil {
 		authenticate.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
 		return
@@ -110,7 +115,7 @@ func (instrumentController *InstrumentController) proxyGet(context *gin.Context)
 	}
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Error proxying GET '%s/%s/%s%s' status code: '%v'\n",
-		instrumentController.CatiUrl, instrumentName, path, resource, resp.StatusCode)
+			instrumentController.CatiUrl, instrumentName, path, resource, resp.StatusCode)
 		InternalServerError(context)
 		return
 	}
@@ -155,7 +160,9 @@ func (instrumentController *InstrumentController) proxyStartInterview(context *g
 		return
 	}
 
-	uacClaim, err := instrumentController.Auth.DecryptJWT(context)
+	session := sessions.Default(context)
+	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
+	uacClaim, err := instrumentController.Auth.DecryptJWT(jwtToken)
 	if err != nil {
 		authenticate.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
 		return
