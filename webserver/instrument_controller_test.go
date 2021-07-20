@@ -31,7 +31,8 @@ var _ = Describe("Open Case", func() {
 		httpRecorder         *httptest.ResponseRecorder
 		responseInfo         = "hello"
 		mockAuth             = &mocks.AuthInterface{}
-		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}, Auth: mockAuth}
+		mockJWTCrypto        = &mocks.JWTCryptoInterface{}
+		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}, Auth: mockAuth, JWTCrypto: mockJWTCrypto}
 		requestBody          io.Reader
 	)
 
@@ -48,6 +49,8 @@ var _ = Describe("Open Case", func() {
 		httpmock.DeactivateAndReset()
 		mockAuth = &mocks.AuthInterface{}
 		instrumentController.Auth = mockAuth
+		mockJWTCrypto = &mocks.JWTCryptoInterface{}
+		instrumentController.JWTCrypto = mockJWTCrypto
 	})
 
 	Describe("Open a case in Blaise", func() {
@@ -57,7 +60,7 @@ var _ = Describe("Open Case", func() {
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
 				mockAuth.On("Authenticated", mock.Anything).Return()
-				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
@@ -81,7 +84,7 @@ var _ = Describe("Open Case", func() {
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
 				mockAuth.On("Authenticated", mock.Anything).Return()
-				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
@@ -101,7 +104,7 @@ var _ = Describe("Open Case", func() {
 		Context("Invalid responses from opening a case in Blaise", func() {
 			JustBeforeEach(func() {
 				mockAuth.On("Authenticated", mock.Anything).Return()
-				mockAuth.On("DecryptJWT", mock.Anything).Return(nil, errors.New("No JWT"))
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(nil, errors.New("No JWT"))
 
 				httpRecorder = httptest.NewRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
@@ -121,7 +124,7 @@ var _ = Describe("Open Case", func() {
 					httpmock.NewJsonResponderOrPanic(500, "Sad face"))
 
 				mockAuth.On("Authenticated", mock.Anything).Return()
-				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
@@ -146,7 +149,7 @@ var _ = Describe("Open Case", func() {
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
 				mockAuth.On("Authenticated", mock.Anything).Return()
-				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
@@ -169,7 +172,7 @@ var _ = Describe("Open Case", func() {
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
 				mockAuth.On("Authenticated", mock.Anything).Return()
-				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
@@ -193,7 +196,7 @@ var _ = Describe("Open Case", func() {
 						httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
 					mockAuth.On("Authenticated", mock.Anything).Return()
-					mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+					mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 						InstrumentName: instrumentName,
 						CaseID:         caseID,
 					}}, nil)
@@ -218,7 +221,7 @@ var _ = Describe("Open Case", func() {
 						httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
 					mockAuth.On("Authenticated", mock.Anything).Return()
-					mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+					mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 						InstrumentName: instrumentName,
 						CaseID:         caseID,
 					}}, nil)

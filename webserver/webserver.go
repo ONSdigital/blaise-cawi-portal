@@ -54,8 +54,12 @@ func (server *Server) SetupRouter() *gin.Engine {
 		os.Exit(1)
 	}
 
-	auth := &authenticate.Auth{
+	jwtCrypto := &authenticate.JWTCrypto{
 		JWTSecret: server.Config.JWTSecret,
+	}
+
+	auth := &authenticate.Auth{
+		JWTCrypto: jwtCrypto,
 		BusApi: &busapi.BusApi{
 			BaseUrl: server.Config.BusUrl,
 			Client:  client,
@@ -68,6 +72,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	authController.AddRoutes(httpRouter)
 	instrumentController := &InstrumentController{
 		Auth:       auth,
+		JWTCrypto:  jwtCrypto,
 		CatiUrl:    server.Config.CatiUrl,
 		HttpClient: httpClient,
 	}

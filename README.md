@@ -6,9 +6,10 @@ Inialising Go
 TODO: 
 - Instrument Controller
     - Edge case tests
-    - Refactor instrument controllers
-    - Can we do anything nicer with timed out sessions?
     - Draw pretty picture for Ken
+
+
+    - Can we do anything nicer with timed out sessions?
 
 
 - Post code will require auth stage 1

@@ -1,17 +1,20 @@
 package authenticate_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
+	mockauth "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi/mocks"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,11 +22,14 @@ import (
 
 var _ = Describe("Login", func() {
 	var (
-		shortUAC = "22222"
-		longUAC  = "1111222233334444"
-		validUAC = "123456789012"
-		auth     = &authenticate.Auth{
+		shortUAC  = "22222"
+		longUAC   = "1111222233334444"
+		validUAC  = "123456789012"
+		jwtCrypto = &authenticate.JWTCrypto{
 			JWTSecret: "hello",
+		}
+		auth = &authenticate.Auth{
+			JWTCrypto: jwtCrypto,
 		}
 		httpRouter   *gin.Engine
 		httpRecorder *httptest.ResponseRecorder
@@ -63,7 +69,7 @@ var _ = Describe("Login", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusMovedPermanently))
 			Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
 			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-			decryptedToken, _ := auth.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
+			decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
 			Expect(decryptedToken.UAC).To(Equal(validUAC))
 			Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
 			Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
@@ -133,9 +139,7 @@ var _ = Describe("Logout", func() {
 		httpRouter   *gin.Engine
 		httpRecorder *httptest.ResponseRecorder
 		session      sessions.Session
-		auth         = &authenticate.Auth{
-			JWTSecret: "hello",
-		}
+		auth         = &authenticate.Auth{}
 	)
 
 	BeforeEach(func() {
@@ -156,7 +160,6 @@ var _ = Describe("Logout", func() {
 		JustBeforeEach(func() {
 			httpRecorder = httptest.NewRecorder()
 			req, _ := http.NewRequest("GET", "/logout", nil)
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
@@ -165,6 +168,151 @@ var _ = Describe("Logout", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("Authenticated", func() {
+	var (
+		session sessions.Session
+
+		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
+		auth          = &authenticate.Auth{
+			JWTCrypto: mockJwtCrypto,
+		}
+		httpRecorder *httptest.ResponseRecorder
+		httpRouter   *gin.Engine
+	)
+
+	BeforeEach(func() {
+		httpRouter = gin.Default()
+		httpRouter.LoadHTMLGlob("../templates/*")
+		store := cookie.NewStore([]byte("secret"))
+		httpRouter.Use(sessions.Sessions("mysession", store))
+
+		httpRouter.Use(func(context *gin.Context) {
+			session = sessions.Default(context)
+			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
+			session.Save()
+			context.Next()
+		})
+
+		httpRouter.Use(auth.Authenticated)
+		httpRouter.GET("/", func(context *gin.Context) {
+			context.JSON(200, true)
+		})
+	})
+
+	AfterEach(func() {
+		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
+		auth.JWTCrypto = mockJwtCrypto
+	})
+
+	JustBeforeEach(func() {
+		httpRecorder = httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/", nil)
+		httpRouter.ServeHTTP(httpRecorder, req)
+	})
+
+	Context("When a token can be decrypted", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
+		})
+
+		It("Allows the context to continue", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(string(body)).To(Equal("true"))
+		})
+	})
+
+	Context("When a token cannot be decrypted", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
+		})
+
+		It("return unauthorized", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+			body := httpRecorder.Body.Bytes()
+			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("Has Session", func() {
+	var (
+		session sessions.Session
+
+		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
+		auth          = &authenticate.Auth{
+			JWTCrypto: mockJwtCrypto,
+		}
+		httpRecorder   *httptest.ResponseRecorder
+		httpRouter     *gin.Engine
+		instrumentName = "foobar"
+		caseID         = "fizzbuzz"
+	)
+
+	BeforeEach(func() {
+		httpRouter = gin.Default()
+		httpRouter.LoadHTMLGlob("../templates/*")
+		store := cookie.NewStore([]byte("secret"))
+		httpRouter.Use(sessions.Sessions("mysession", store))
+
+		httpRouter.Use(func(context *gin.Context) {
+			session = sessions.Default(context)
+			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
+			session.Save()
+			context.Next()
+		})
+
+		httpRouter.GET("/", func(context *gin.Context) {
+			hasSession, claim := auth.HasSession(context)
+			context.JSON(200, struct {
+				HasSession bool
+				Claim      *authenticate.UACClaims
+			}{
+				HasSession: hasSession,
+				Claim:      claim,
+			})
+		})
+	})
+
+	AfterEach(func() {
+		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
+		auth.JWTCrypto = mockJwtCrypto
+	})
+
+	JustBeforeEach(func() {
+		httpRecorder = httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/", nil)
+		httpRouter.ServeHTTP(httpRecorder, req)
+	})
+
+	Context("When someone has a session", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+				InstrumentName: instrumentName,
+				CaseID:         caseID,
+			}}, nil)
+		})
+
+		It("returns true and a claim", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(string(body)).To(Equal(`{"HasSession":true,"Claim":{"uac":"","instrument_name":"foobar","case_id":"fizzbuzz"}}`))
+		})
+	})
+
+	Context("When someone doesn't have a session", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
+		})
+
+		It("returns false and an empty claim", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(string(body)).To(Equal(`{"HasSession":false,"Claim":null}`))
 		})
 	})
 })

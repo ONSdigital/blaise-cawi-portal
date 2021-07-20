@@ -21,29 +21,6 @@ func (_m *AuthInterface) Authenticated(_a0 *gin.Context) {
 	_m.Called(_a0)
 }
 
-// DecryptJWT provides a mock function with given fields: _a0
-func (_m *AuthInterface) DecryptJWT(_a0 interface{}) (*authenticate.UACClaims, error) {
-	ret := _m.Called(_a0)
-
-	var r0 *authenticate.UACClaims
-	if rf, ok := ret.Get(0).(func(interface{}) *authenticate.UACClaims); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*authenticate.UACClaims)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // HasSession provides a mock function with given fields: _a0
 func (_m *AuthInterface) HasSession(_a0 *gin.Context) (bool, *authenticate.UACClaims) {
 	ret := _m.Called(_a0)
