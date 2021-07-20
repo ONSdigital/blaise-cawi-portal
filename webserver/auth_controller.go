@@ -25,7 +25,7 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 	hasSession, claim := authController.Auth.HasSession(context)
 	if hasSession {
-		context.Redirect(http.StatusMovedPermanently, fmt.Sprintf("/%s/", claim.UacInfo.InstrumentName))
+		context.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/%s/", claim.UacInfo.InstrumentName))
 		return
 	}
 	context.HTML(http.StatusOK, "login.tmpl", gin.H{})

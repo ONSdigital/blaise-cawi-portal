@@ -1,0 +1,32 @@
+{{ define "header" }}
+<header class="header " role="banner">
+            <div class="header__top">
+                <div class="container">
+                    <div class="header__grid-top grid grid--gutterless grid--flex grid--between grid--vertical-center grid--no-wrap ">
+                        <div class="grid__col col-auto">
+                            <a class="header__logo-link" href="/">
+                                <picture>
+                                    <source alt="Office for National Statistics logo"
+                                            media="(max-width: 499px)"
+                                            srcset="https://cdn.ons.gov.uk/sdc/design-system/31.4.0/img/ons-logo-stacked-pos-en.svg">
+                                    <img alt="Office for National Statistics logo"
+                                         class="header__logo"
+                                         src="https://cdn.ons.gov.uk/sdc/design-system/31.4.0/img/ons-logo-stacked-pos-en.svg">
+                                </picture>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="header__main">
+                <div class="container">
+                    <div class="grid grid--gutterless grid--flex grid--between grid--vertical-center grid--no-wrap">
+                        <div class="grid__col col-auto u-flex-shrink">
+                        {{/* TODO: Put the right name ! */}}
+                            <div class="header__title">Blaise Web Access</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+{{ end }}
