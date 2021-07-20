@@ -32,8 +32,15 @@ var _ = Describe("Auth Controller", func() {
 
 	Describe("GET /auth/login", func() {
 		var (
+			mockAuth     *mocks.AuthInterface
 			httpRecorder *httptest.ResponseRecorder
 		)
+
+		BeforeEach(func() {
+			mockAuth = &mocks.AuthInterface{}
+			mockAuth.On("HasSession", mock.Anything).Return(false, nil)
+			authController.Auth = mockAuth
+		})
 
 		JustBeforeEach(func() {
 			httpRecorder = httptest.NewRecorder()

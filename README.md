@@ -5,8 +5,13 @@ Inialising Go
 
 TODO: 
 - Instrument Controller
-    - A whole load of proxying
-    - Tests
+    - Edge case tests
+    - Refactor instrument controllers
+    - add default end point
+    - remove pointer pointer :(
+    - Can we do anything nicer with timed out sessions?
+    - Draw pretty picture for Ken
+    - Look at weird double page errors
 
 
 - Post code will require auth stage 1
