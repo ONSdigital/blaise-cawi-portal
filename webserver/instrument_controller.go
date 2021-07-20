@@ -24,9 +24,9 @@ type InstrumentController struct {
 
 func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engine) {
 	instrumentRouter := httpRouter.Group("/:instrumentName")
+	instrumentRouter.Use(instrumentController.Auth.Authenticated)
 	{
 		instrumentRouter.GET("/", func(context *gin.Context) {
-			instrumentController.Auth.Authenticated(context)
 			instrumentController.openCase(context)
 		})
 		// Example path /dst2101a/resources/js/jskdjasjdlkasjld.js
@@ -34,18 +34,15 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 		// path = resources
 		// resource = /js/jskdjasjdlkasjld.js
 		instrumentRouter.GET("/:path/*resource", func(context *gin.Context) {
-			instrumentController.Auth.Authenticated(context)
 			instrumentController.proxyGet(context)
 		})
 		// Above root would only match /dst2101a/resources/*
 		// We have to add this to additonally match /dst2101a/resources
 		instrumentRouter.GET("/:path", func(context *gin.Context) {
-			instrumentController.Auth.Authenticated(context)
 			instrumentController.proxyGet(context)
 		})
 
 		instrumentRouter.POST("/*path", func(context *gin.Context) {
-			instrumentController.Auth.Authenticated(context)
 			instrumentController.proxyPost(context)
 		})
 	}
