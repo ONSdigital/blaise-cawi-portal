@@ -9,7 +9,6 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
 )
 
 const (
@@ -30,13 +29,12 @@ type AuthInterface interface {
 	Authenticated(*gin.Context)
 	Login(*gin.Context, sessions.Session)
 	Logout(*gin.Context, sessions.Session)
-	DecryptJWT(interface{}) (*UACClaims, error)
 	HasSession(*gin.Context) (bool, *UACClaims)
 }
 
 type Auth struct {
-	JWTSecret string
 	BusApi    busapi.BusApiInterface
+	JWTCrypto JWTCryptoInterface
 }
 
 func (auth *Auth) Authenticated(context *gin.Context) {
@@ -48,7 +46,7 @@ func (auth *Auth) Authenticated(context *gin.Context) {
 		return
 	}
 
-	_, err := auth.DecryptJWT(jwtToken)
+	_, err := auth.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
 		log.Println(err)
 		notAuth(context)
@@ -65,7 +63,7 @@ func (auth *Auth) HasSession(context *gin.Context) (bool, *UACClaims) {
 		return false, nil
 	}
 
-	claim, err := auth.DecryptJWT(jwtToken)
+	claim, err := auth.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
 		return false, nil
 	}
@@ -90,7 +88,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	signedToken, err := auth.encryptJWT(uac, &uacInfo)
+	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo)
 	if err != nil {
 		log.Println(err)
 		NotAuthWithError(context, INTERNAL_SERVER_ERR)
@@ -105,40 +103,6 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 	context.Redirect(http.StatusMovedPermanently, fmt.Sprintf("/%s/", uacInfo.InstrumentName))
 	context.Abort()
-}
-
-func (auth *Auth) encryptJWT(uac string, uacInfo *busapi.UacInfo) (string, error) {
-	claims := UACClaims{
-		UAC: uac,
-		UacInfo: busapi.UacInfo{
-			InstrumentName: uacInfo.InstrumentName,
-			CaseID:         uacInfo.CaseID,
-		},
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Unix() + expirationSeconds(),
-			Issuer:    ISSUER,
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(auth.JWTSecret))
-}
-
-func (auth *Auth) DecryptJWT(jwtToken interface{}) (*UACClaims, error) {
-	if jwtToken == nil {
-		return nil, fmt.Errorf("No JWT Token in session")
-	}
-	token, err := jwt.ParseWithClaims(jwtToken.(string), &UACClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(auth.JWTSecret), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := token.Claims.Valid(); err != nil {
-		return nil, err
-	}
-
-	return token.Claims.(*UACClaims), nil
 }
 
 func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {

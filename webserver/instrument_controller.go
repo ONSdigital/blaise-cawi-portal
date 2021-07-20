@@ -18,6 +18,7 @@ import (
 
 type InstrumentController struct {
 	Auth       authenticate.AuthInterface
+	JWTCrypto  authenticate.JWTCryptoInterface
 	CatiUrl    string
 	HttpClient *http.Client
 }
@@ -51,7 +52,7 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 func (instrumentController *InstrumentController) instrumentAuth(context *gin.Context) (*authenticate.UACClaims, error) {
 	session := sessions.Default(context)
 	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
-	uacClaim, err := instrumentController.Auth.DecryptJWT(jwtToken)
+	uacClaim, err := instrumentController.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
 		authenticate.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
 		return nil, err

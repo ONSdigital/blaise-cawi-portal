@@ -1,11 +1,14 @@
 package webserver_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
+	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
+	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -20,6 +23,8 @@ var _ = Describe("Auth Controller", func() {
 	var (
 		httpRouter     *gin.Engine
 		authController = &webserver.AuthController{}
+		instrumentName = "foobar"
+		caseID         = "fizzbuzz"
 	)
 
 	BeforeEach(func() {
@@ -49,10 +54,41 @@ var _ = Describe("Auth Controller", func() {
 		})
 
 		Context("when I access auth/login I am presented with the login template", func() {
+			JustBeforeEach(func() {
+				httpRecorder = httptest.NewRecorder()
+				req, _ := http.NewRequest("GET", "/auth/login", nil)
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
 			It("returns a 200 response and the login page", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+			})
+		})
+
+		Context("when I access auth/login with an active session", func() {
+			JustBeforeEach(func() {
+				httpRecorder = httptest.NewRecorder()
+
+				mockAuth = &mocks.AuthInterface{}
+
+				mockAuth.On("HasSession", mock.Anything).Return(true, &authenticate.UACClaims{UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+				}}, nil)
+
+				authController.Auth = mockAuth
+
+				req, _ := http.NewRequest("GET", "/auth/login", nil)
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
+			It("returns a temporary redirect response", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusTemporaryRedirect))
+
+				header := httpRecorder.HeaderMap["Location"]
+				Expect(header).To(Equal([]string{fmt.Sprintf("/%s/", instrumentName)}))
 			})
 		})
 	})
