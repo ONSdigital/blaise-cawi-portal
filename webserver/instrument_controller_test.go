@@ -30,8 +30,8 @@ var _ = Describe("Open Case", func() {
 		httpRouter           *gin.Engine
 		httpRecorder         *httptest.ResponseRecorder
 		responseInfo         = "hello"
-		mockAuth             *mocks.AuthInterface
-		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}}
+		mockAuth             = &mocks.AuthInterface{}
+		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}, Auth: mockAuth}
 		requestBody          io.Reader
 	)
 
@@ -46,6 +46,8 @@ var _ = Describe("Open Case", func() {
 
 	AfterEach(func() {
 		httpmock.DeactivateAndReset()
+		mockAuth = &mocks.AuthInterface{}
+		instrumentController.Auth = mockAuth
 	})
 
 	Describe("Open a case in Blaise", func() {
@@ -54,7 +56,6 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth = &mocks.AuthInterface{}
 				mockAuth.On("Authenticated", mock.Anything).Return()
 				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
@@ -79,13 +80,11 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth = &mocks.AuthInterface{}
 				mockAuth.On("Authenticated", mock.Anything).Return()
 				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
-				instrumentController.Auth = mockAuth
 
 				httpRecorder = httptest.NewRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", "fwibble"), nil)
@@ -101,10 +100,8 @@ var _ = Describe("Open Case", func() {
 
 		Context("Invalid responses from opening a case in Blaise", func() {
 			JustBeforeEach(func() {
-				mockAuth = &mocks.AuthInterface{}
 				mockAuth.On("Authenticated", mock.Anything).Return()
 				mockAuth.On("DecryptJWT", mock.Anything).Return(nil, errors.New("No JWT"))
-				instrumentController.Auth = mockAuth
 
 				httpRecorder = httptest.NewRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
@@ -123,13 +120,11 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(500, "Sad face"))
 
-				mockAuth = &mocks.AuthInterface{}
 				mockAuth.On("Authenticated", mock.Anything).Return()
 				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
-				instrumentController.Auth = mockAuth
 
 				httpRecorder = httptest.NewRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
@@ -150,13 +145,11 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble/dwibble/qwibble", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth = &mocks.AuthInterface{}
 				mockAuth.On("Authenticated", mock.Anything).Return()
 				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
-				instrumentController.Auth = mockAuth
 
 				httpRecorder = httptest.NewRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble/dwibble/qwibble", instrumentName), nil)
@@ -175,13 +168,11 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth = &mocks.AuthInterface{}
 				mockAuth.On("Authenticated", mock.Anything).Return()
 				mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
 				}}, nil)
-				instrumentController.Auth = mockAuth
 
 				httpRecorder = httptest.NewRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble", instrumentName), nil)
@@ -201,13 +192,11 @@ var _ = Describe("Open Case", func() {
 					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
 						httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-					mockAuth = &mocks.AuthInterface{}
 					mockAuth.On("Authenticated", mock.Anything).Return()
 					mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 						InstrumentName: instrumentName,
 						CaseID:         caseID,
 					}}, nil)
-					instrumentController.Auth = mockAuth
 
 					requestBody = bytes.NewReader([]byte(`{"foo":"bar"}`))
 
@@ -228,13 +217,11 @@ var _ = Describe("Open Case", func() {
 					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/api/application/start_interview", catiUrl, instrumentName),
 						httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-					mockAuth = &mocks.AuthInterface{}
 					mockAuth.On("Authenticated", mock.Anything).Return()
 					mockAuth.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 						InstrumentName: instrumentName,
 						CaseID:         caseID,
 					}}, nil)
-					instrumentController.Auth = mockAuth
 
 					requestBody = bytes.NewReader([]byte(fmt.Sprintf(`{
 						"RuntimeParameters": {
