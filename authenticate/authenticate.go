@@ -31,6 +31,7 @@ type AuthInterface interface {
 	Login(*gin.Context, sessions.Session)
 	Logout(*gin.Context, sessions.Session)
 	DecryptJWT(interface{}) (*UACClaims, error)
+	HasSession(*gin.Context) (bool, *UACClaims)
 }
 
 type Auth struct {
@@ -54,6 +55,21 @@ func (auth *Auth) Authenticated(context *gin.Context) {
 		return
 	}
 	context.Next()
+}
+
+func (auth *Auth) HasSession(context *gin.Context) (bool, *UACClaims) {
+	session := sessions.Default(context)
+	jwtToken := session.Get(JWT_TOKEN_KEY)
+
+	if jwtToken == nil {
+		return false, nil
+	}
+
+	claim, err := auth.DecryptJWT(jwtToken)
+	if err != nil {
+		return false, nil
+	}
+	return true, claim
 }
 
 func (auth *Auth) Login(context *gin.Context, session sessions.Session) {

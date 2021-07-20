@@ -74,5 +74,11 @@ func (server *Server) SetupRouter() *gin.Engine {
 	instrumentController.AddRoutes(httpRouter)
 	healthController := &HealthController{}
 	healthController.AddRoutes(httpRouter)
+
+	httpRouter.GET("/", authController.LoginEndpoint)
+
+	httpRouter.NoRoute(func(context *gin.Context) {
+		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{})
+	})
 	return httpRouter
 }
