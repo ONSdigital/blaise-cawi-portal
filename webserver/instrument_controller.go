@@ -48,23 +48,30 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 	}
 }
 
-func (instrumentController *InstrumentController) openCase(context *gin.Context) {
+func (instrumentController *InstrumentController) instrumentAuth(context *gin.Context) (*authenticate.UACClaims, error) {
 	session := sessions.Default(context)
 	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
 	uacClaim, err := instrumentController.Auth.DecryptJWT(jwtToken)
 	if err != nil {
 		authenticate.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
-		return
+		return nil, err
 	}
 	instrumentName := context.Param("instrumentName")
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
 		authenticate.Forbidden(context)
+		return nil, fmt.Errorf("Forbidden")
+	}
+	return uacClaim, nil
+}
+
+func (instrumentController *InstrumentController) openCase(context *gin.Context) {
+	uacClaim, err := instrumentController.instrumentAuth(context)
+	if err != nil {
 		return
 	}
-
 	resp, err := http.PostForm(
 		fmt.Sprintf("%s/%s/default.aspx", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName),
-		blaise.CasePayload(uacClaim.CaseID).Form(),
+		blaise.CasePayload(uacClaim.UacInfo.CaseID).Form(),
 	)
 	if err != nil {
 		InternalServerError(context)
@@ -87,23 +94,15 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 }
 
 func (instrumentController *InstrumentController) proxyGet(context *gin.Context) {
-	instrumentName := context.Param("instrumentName")
 	path := context.Param("path")
 	resource := context.Param("resource")
 
-	session := sessions.Default(context)
-	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
-	uacClaim, err := instrumentController.Auth.DecryptJWT(jwtToken)
+	uacClaim, err := instrumentController.instrumentAuth(context)
 	if err != nil {
-		authenticate.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
-		return
-	}
-	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
-		authenticate.Forbidden(context)
 		return
 	}
 
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/%s/%s%s", instrumentController.CatiUrl, instrumentName, path, resource), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/%s/%s%s", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path, resource), nil)
 	addHeaders(req, context)
 	resp, err := instrumentController.HttpClient.Do(req)
 	if err != nil {
@@ -112,7 +111,7 @@ func (instrumentController *InstrumentController) proxyGet(context *gin.Context)
 	}
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Error proxying GET '%s/%s/%s%s' status code: '%v'\n",
-			instrumentController.CatiUrl, instrumentName, path, resource, resp.StatusCode)
+			instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path, resource, resp.StatusCode)
 		InternalServerError(context)
 		return
 	}
@@ -126,22 +125,27 @@ func (instrumentController *InstrumentController) proxyGet(context *gin.Context)
 }
 
 func (instrumentController *InstrumentController) proxyPost(context *gin.Context) {
-	instrumentName := context.Param("instrumentName")
+	uacClaim, err := instrumentController.instrumentAuth(context)
+	if err != nil {
+		return
+	}
 	path := context.Param("path")
 	if path == "/api/application/start_interview" {
-		instrumentController.proxyStartInterview(context, instrumentName, path)
+		instrumentController.proxyStartInterview(context, path, uacClaim)
 	} else {
 		requestBody, err := ioutil.ReadAll(context.Request.Body)
 		if err != nil {
 			InternalServerError(context)
 			return
 		}
-		instrumentController.proxyPoster(context, fmt.Sprintf("%s/%s%s", instrumentController.CatiUrl, instrumentName, path), bytes.NewBuffer(requestBody))
+		instrumentController.proxyPoster(context,
+			fmt.Sprintf("%s/%s%s", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path),
+			bytes.NewBuffer(requestBody),
+		)
 	}
-	return
 }
 
-func (instrumentController *InstrumentController) proxyStartInterview(context *gin.Context, instrumentName, path string) {
+func (instrumentController *InstrumentController) proxyStartInterview(context *gin.Context, path string, uacClaim *authenticate.UACClaims) {
 	var startInterview blaise.StartInterview
 	startInterviewBody, err := ioutil.ReadAll(context.Request.Body)
 	if err != nil {
@@ -157,18 +161,14 @@ func (instrumentController *InstrumentController) proxyStartInterview(context *g
 		return
 	}
 
-	session := sessions.Default(context)
-	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
-	uacClaim, err := instrumentController.Auth.DecryptJWT(jwtToken)
-	if err != nil {
-		authenticate.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
-		return
-	}
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
 		authenticate.Forbidden(context)
 		return
 	}
-	instrumentController.proxyPoster(context, fmt.Sprintf("%s/%s%s", instrumentController.CatiUrl, instrumentName, path), bytes.NewBuffer(startInterviewBody))
+	instrumentController.proxyPoster(context,
+		fmt.Sprintf("%s/%s%s", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path),
+		bytes.NewBuffer(startInterviewBody),
+	)
 }
 
 func (instrumentController *InstrumentController) proxyPoster(context *gin.Context, url string, requestBody io.Reader) {
@@ -192,7 +192,6 @@ func (instrumentController *InstrumentController) proxyPoster(context *gin.Conte
 	}
 	defer resp.Body.Close()
 	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
-	return
 }
 
 func addHeaders(req *http.Request, context *gin.Context) {
@@ -205,35 +204,3 @@ func addHeaders(req *http.Request, context *gin.Context) {
 		req.Header.Set(header, strings.Join(value, ", s"))
 	}
 }
-
-// func instrumentGroup(httpRouter *gin.Engine, auth *Auth, controller *Controller) {
-// 	instrumentRouter := httpRouter.Group("/:instrumentName")
-// 	{
-// 		instrumentRouter.GET("/*path", func(context *gin.Context) {
-// 			auth.Required(context)
-// 			instrumentName := context.Param("instrumentName")
-// 			path := context.Param("path")
-// 			if !auth.AuthenticatedForInstrument(context, instrumentName) {
-// 				context.AbortWithStatus(http.StatusForbidden)
-// 				return
-// 			}
-// 			if path == "/" {
-// 				controller.openCase(context, auth)
-// 				return
-// 			} else {
-// 				controller.proxyGet(context, instrumentName, path)
-// 			}
-// 			return
-// 		})
-
-// 		instrumentRouter.POST("/*path", func(context *gin.Context) {
-// 			auth.Required(context)
-// 			instrumentName := context.Param("instrumentName")
-// 			path := context.Param("path")
-// 			if !auth.AuthenticatedForInstrument(context, instrumentName) {
-// 				context.AbortWithStatus(http.StatusForbidden)
-// 			}
-// 			controller.proxyPost(context, instrumentName, path, auth)
-// 			return
-// 		})
-// 	}
