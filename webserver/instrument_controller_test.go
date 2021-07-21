@@ -153,6 +153,8 @@ var _ = Describe("Open Case", func() {
 
 				httpRecorder = httptest.NewRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble/dwibble/qwibble", instrumentName), nil)
+				req.Header.Add("Content-Type", "application/json")
+				req.Header.Add("Connection", "foobar")
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
 
@@ -184,23 +186,107 @@ var _ = Describe("Open Case", func() {
 			})
 		})
 
-		Describe("Proxy post requests to blaise", func() {
-			Context("Making a request for a blaise resource posts proxied to the blaise server", func() {
-				JustBeforeEach(func() {
-					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
-						httpmock.NewJsonResponderOrPanic(200, responseInfo))
+		Context("When a proxies get returns a non 200 status code", func() {
+			JustBeforeEach(func() {
+				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
+					httpmock.NewJsonResponderOrPanic(404, responseInfo))
 
-					mockAuth.On("Authenticated", mock.Anything).Return()
-					mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
-						InstrumentName: instrumentName,
-						CaseID:         caseID,
-					}}, nil)
+				mockAuth.On("Authenticated", mock.Anything).Return()
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+				}}, nil)
 
-					requestBody = bytes.NewReader([]byte(`{"foo":"bar"}`))
+				httpRecorder = httptest.NewRecorder()
+				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble", instrumentName), nil)
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
 
-					httpRecorder = httptest.NewRecorder()
-					req, _ := http.NewRequest("POST", fmt.Sprintf("/%s/fwibble", instrumentName), requestBody)
-					httpRouter.ServeHTTP(httpRecorder, req)
+			It("gets wrapped by an internal server error", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusInternalServerError))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<h1>Sorry, there is a problem with the service</h1>`))
+			})
+		})
+
+		Context("When the get is for a different instrument", func() {
+			JustBeforeEach(func() {
+				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, "notMyInstrument"),
+					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+
+				mockAuth.On("Authenticated", mock.Anything).Return()
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+				}}, nil)
+
+				httpRecorder = httptest.NewRecorder()
+				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble", "notMyInstrument"), nil)
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
+			It("gets wrapped by a http forbidden error", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(
+					`To access this page you need to <a href="/">re-enter your access code</a>`,
+				))
+			})
+		})
+	})
+
+	Describe("Proxy post requests to blaise", func() {
+		Context("Making a request for a blaise resource posts proxied to the blaise server", func() {
+			JustBeforeEach(func() {
+				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
+					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+
+				mockAuth.On("Authenticated", mock.Anything).Return()
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+				}}, nil)
+
+				requestBody = bytes.NewReader([]byte(`{"foo":"bar"}`))
+
+				httpRecorder = httptest.NewRecorder()
+				req, _ := http.NewRequest("POST", fmt.Sprintf("/%s/fwibble", instrumentName), requestBody)
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
+			It("Returns a 200 response and some data", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
+			})
+		})
+
+		Context("Making a request to start interview via POST to Blaise server", func() {
+			var requestedCaseID string
+
+			JustBeforeEach(func() {
+				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/api/application/start_interview", catiUrl, instrumentName),
+					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+
+				mockAuth.On("Authenticated", mock.Anything).Return()
+				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+				}}, nil)
+
+				requestBody = bytes.NewReader([]byte(fmt.Sprintf(`{
+						"RuntimeParameters": {
+							"KeyValue": "%s",
+							"Mode": "CAWI",
+							"LayoutSet": "CAWI-Web_Large"
+						}
+					}`, requestedCaseID)))
+
+				httpRecorder = httptest.NewRecorder()
+				req, _ := http.NewRequest("POST", fmt.Sprintf("/%s/api/application/start_interview", instrumentName), requestBody)
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
+			Context("When the case ID has authorisation", func() {
+				BeforeEach(func() {
+					requestedCaseID = caseID
 				})
 
 				It("Returns a 200 response and some data", func() {
@@ -209,33 +295,16 @@ var _ = Describe("Open Case", func() {
 				})
 			})
 
-			Context("Making a request to start interview via POST to Blaise server", func() {
-				JustBeforeEach(func() {
-					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/api/application/start_interview", catiUrl, instrumentName),
-						httpmock.NewJsonResponderOrPanic(200, responseInfo))
-
-					mockAuth.On("Authenticated", mock.Anything).Return()
-					mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
-						InstrumentName: instrumentName,
-						CaseID:         caseID,
-					}}, nil)
-
-					requestBody = bytes.NewReader([]byte(fmt.Sprintf(`{
-						"RuntimeParameters": {
-							"KeyValue": "%s",
-							"Mode": "CAWI",
-							"LayoutSet": "CAWI-Web_Large"
-						}
-					}`, caseID)))
-
-					httpRecorder = httptest.NewRecorder()
-					req, _ := http.NewRequest("POST", fmt.Sprintf("/%s/api/application/start_interview", instrumentName), requestBody)
-					httpRouter.ServeHTTP(httpRecorder, req)
+			Context("When the case ID does not have authorisation", func() {
+				BeforeEach(func() {
+					requestedCaseID = "notMyCaseID"
 				})
 
 				It("Returns a 200 response and some data", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
+					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(
+						`To access this page you need to <a href="/">re-enter your access code</a>`,
+					))
 				})
 			})
 		})
