@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -62,8 +61,7 @@ var _ = Describe("Auth Controller", func() {
 
 			It("returns a 200 response and the login page", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Access survey</span>`))
 			})
 		})
 
