@@ -128,6 +128,7 @@ func (instrumentController *InstrumentController) proxyGet(context *gin.Context)
 func (instrumentController *InstrumentController) proxyPost(context *gin.Context) {
 	uacClaim, err := instrumentController.instrumentAuth(context)
 	if err != nil {
+		authenticate.Forbidden(context)
 		return
 	}
 	path := context.Param("path")
