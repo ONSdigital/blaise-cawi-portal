@@ -20,8 +20,8 @@ const (
 	ISSUER              = "social-surveys-web-portal"
 )
 
-// var expirationTime = "2h"
-var expirationTime = "30s"
+var expirationTime = "2h"
+// var expirationTime = "30s"
 
 //Generate mocks by running "go generate ./..."
 //go:generate mockery --name AuthInterface

@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -73,8 +72,7 @@ var _ = Describe("Open Case", func() {
 
 			It("Returns a 200 response and some data", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), responseInfo)).To(BeTrue())
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
 			})
 		})
 
@@ -96,8 +94,9 @@ var _ = Describe("Open Case", func() {
 
 			It("Returns a 403", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-				// body := httpRecorder.Body.Bytes()
-				// Expect(strings.Contains(string(body), responseInfo)).To(BeTrue())
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(
+					`To access this page you need to <a href="/">re-enter your access code</a>`,
+				))
 			})
 		})
 
@@ -113,8 +112,7 @@ var _ = Describe("Open Case", func() {
 
 			It("Returns a 401 response with an internal server error", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), authenticate.INTERNAL_SERVER_ERR)).To(BeTrue())
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(authenticate.INTERNAL_SERVER_ERR))
 			})
 		})
 
@@ -136,8 +134,7 @@ var _ = Describe("Open Case", func() {
 
 			It("return a 500 error and redirect to the internal server error page", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusInternalServerError))
-				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), "Sorry, there is a problem with the service")).To(BeTrue())
+				Expect(httpRecorder.Body.String()).To(ContainSubstring("Sorry, there is a problem with the service"))
 			})
 		})
 	})
@@ -161,8 +158,7 @@ var _ = Describe("Open Case", func() {
 
 			It("Returns a 200 response and some data", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), responseInfo)).To(BeTrue())
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
 			})
 		})
 
@@ -184,8 +180,7 @@ var _ = Describe("Open Case", func() {
 
 			It("Returns a 200 response and some data", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), responseInfo)).To(BeTrue())
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
 			})
 		})
 
@@ -210,8 +205,7 @@ var _ = Describe("Open Case", func() {
 
 				It("Returns a 200 response and some data", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), responseInfo)).To(BeTrue())
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
 				})
 			})
 
@@ -241,8 +235,7 @@ var _ = Describe("Open Case", func() {
 
 				It("Returns a 200 response and some data", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), responseInfo)).To(BeTrue())
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
 				})
 			})
 		})
