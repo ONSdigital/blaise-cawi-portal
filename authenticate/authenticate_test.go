@@ -189,21 +189,10 @@ var _ = Describe("Authenticated", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
-
-		httpRouter.Use(func(context *gin.Context) {
-			session = sessions.Default(context)
-			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
-			session.Save()
-			context.Next()
-		})
-
-		httpRouter.Use(auth.Authenticated)
-		httpRouter.GET("/", func(context *gin.Context) {
-			context.JSON(200, true)
-		})
 	})
 
 	AfterEach(func() {
+		httpRouter = gin.Default()
 		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
 		auth.JWTCrypto = mockJwtCrypto
 	})
@@ -214,21 +203,51 @@ var _ = Describe("Authenticated", func() {
 		httpRouter.ServeHTTP(httpRecorder, req)
 	})
 
-	Context("When a token can be decrypted", func() {
+	Context("when there is a token", func() {
 		BeforeEach(func() {
-			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
+			httpRouter.Use(func(context *gin.Context) {
+				session = sessions.Default(context)
+				session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
+				session.Save()
+				context.Next()
+			})
+			httpRouter.Use(auth.Authenticated)
+			httpRouter.GET("/", func(context *gin.Context) {
+				context.JSON(200, true)
+			})
 		})
 
-		It("Allows the context to continue", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			body := httpRecorder.Body.Bytes()
-			Expect(string(body)).To(Equal("true"))
+		Context("When a token can be decrypted", func() {
+			BeforeEach(func() {
+				mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
+			})
+
+			It("Allows the context to continue", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+				body := httpRecorder.Body.Bytes()
+				Expect(string(body)).To(Equal("true"))
+			})
+		})
+
+		Context("When a token cannot be decrypted", func() {
+			BeforeEach(func() {
+				mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
+			})
+
+			It("return unauthorized", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+				body := httpRecorder.Body.Bytes()
+				Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+			})
 		})
 	})
 
-	Context("When a token cannot be decrypted", func() {
+	Context("When there is no token", func() {
 		BeforeEach(func() {
-			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
+			httpRouter.Use(auth.Authenticated)
+			httpRouter.GET("/", func(context *gin.Context) {
+				context.JSON(200, true)
+			})
 		})
 
 		It("return unauthorized", func() {
