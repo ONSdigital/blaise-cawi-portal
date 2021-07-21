@@ -16,8 +16,13 @@ type AuthInterface struct {
 	mock.Mock
 }
 
-// Authenticated provides a mock function with given fields: _a0
-func (_m *AuthInterface) Authenticated(_a0 *gin.Context) {
+// AuthenticatedStage1 provides a mock function with given fields: _a0
+func (_m *AuthInterface) AuthenticatedStage1(_a0 *gin.Context) {
+	_m.Called(_a0)
+}
+
+// AuthenticatedStage2 provides a mock function with given fields: _a0
+func (_m *AuthInterface) AuthenticatedStage2(_a0 *gin.Context) {
 	_m.Called(_a0)
 }
 
@@ -46,6 +51,11 @@ func (_m *AuthInterface) HasSession(_a0 *gin.Context) (bool, *authenticate.UACCl
 
 // Login provides a mock function with given fields: _a0, _a1
 func (_m *AuthInterface) Login(_a0 *gin.Context, _a1 sessions.Session) {
+	_m.Called(_a0, _a1)
+}
+
+// LoginPostcode provides a mock function with given fields: _a0, _a1
+func (_m *AuthInterface) LoginPostcode(_a0 *gin.Context, _a1 sessions.Session) {
 	_m.Called(_a0, _a1)
 }
 

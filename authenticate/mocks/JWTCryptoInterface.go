@@ -57,3 +57,24 @@ func (_m *JWTCryptoInterface) EncryptJWT(_a0 string, _a1 *busapi.UacInfo) (strin
 
 	return r0, r1
 }
+
+// EncryptValidatedPostcodeJWT provides a mock function with given fields: _a0
+func (_m *JWTCryptoInterface) EncryptValidatedPostcodeJWT(_a0 *authenticate.UACClaims) (string, error) {
+	ret := _m.Called(_a0)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(*authenticate.UACClaims) string); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*authenticate.UACClaims) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}

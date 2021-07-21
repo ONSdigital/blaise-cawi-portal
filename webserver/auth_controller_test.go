@@ -21,7 +21,8 @@ import (
 var _ = Describe("Auth Controller", func() {
 	var (
 		httpRouter     *gin.Engine
-		authController = &webserver.AuthController{}
+		mockAuth       = &mocks.AuthInterface{}
+		authController = &webserver.AuthController{Auth: mockAuth}
 		instrumentName = "foobar"
 		caseID         = "fizzbuzz"
 	)
@@ -34,17 +35,15 @@ var _ = Describe("Auth Controller", func() {
 		authController.AddRoutes(httpRouter)
 	})
 
+	AfterEach(func() {
+		mockAuth = &mocks.AuthInterface{}
+		authController = &webserver.AuthController{Auth: mockAuth}
+	})
+
 	Describe("GET /auth/login", func() {
 		var (
-			mockAuth     *mocks.AuthInterface
 			httpRecorder *httptest.ResponseRecorder
 		)
-
-		BeforeEach(func() {
-			mockAuth = &mocks.AuthInterface{}
-			mockAuth.On("HasSession", mock.Anything).Return(false, nil)
-			authController.Auth = mockAuth
-		})
 
 		JustBeforeEach(func() {
 			httpRecorder = httptest.NewRecorder()
@@ -53,10 +52,8 @@ var _ = Describe("Auth Controller", func() {
 		})
 
 		Context("when I access auth/login I am presented with the login template", func() {
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				req, _ := http.NewRequest("GET", "/auth/login", nil)
-				httpRouter.ServeHTTP(httpRecorder, req)
+			BeforeEach(func() {
+				mockAuth.On("HasSession", mock.Anything).Return(false, nil)
 			})
 
 			It("returns a 200 response and the login page", func() {
@@ -69,14 +66,10 @@ var _ = Describe("Auth Controller", func() {
 			JustBeforeEach(func() {
 				httpRecorder = httptest.NewRecorder()
 
-				mockAuth = &mocks.AuthInterface{}
-
 				mockAuth.On("HasSession", mock.Anything).Return(true, &authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
-				}}, nil)
-
-				authController.Auth = mockAuth
+				}, PostcodeValidated: true}, nil)
 
 				req, _ := http.NewRequest("GET", "/auth/login", nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
@@ -93,14 +86,11 @@ var _ = Describe("Auth Controller", func() {
 
 	Describe("POST /auth/login", func() {
 		var (
-			mockAuth     *mocks.AuthInterface
 			httpRecorder *httptest.ResponseRecorder
 		)
 
 		BeforeEach(func() {
-			mockAuth = &mocks.AuthInterface{}
 			mockAuth.On("Login", mock.Anything, mock.Anything).Return()
-			authController.Auth = mockAuth
 		})
 
 		JustBeforeEach(func() {
@@ -116,14 +106,11 @@ var _ = Describe("Auth Controller", func() {
 
 	Describe("GET /auth/logout", func() {
 		var (
-			mockAuth     *mocks.AuthInterface
 			httpRecorder *httptest.ResponseRecorder
 		)
 
 		BeforeEach(func() {
-			mockAuth = &mocks.AuthInterface{}
 			mockAuth.On("Logout", mock.Anything, mock.Anything).Return()
-			authController.Auth = mockAuth
 		})
 
 		JustBeforeEach(func() {

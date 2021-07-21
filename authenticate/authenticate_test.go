@@ -65,9 +65,9 @@ var _ = Describe("Login", func() {
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		It("redirects to /:instrumentName/", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusMovedPermanently))
-			Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
+		It("redirects to /auth/login/postcode", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusFound))
+			Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/auth/login/postcode"}))
 			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 			decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
 			Expect(decryptedToken.UAC).To(Equal(validUAC))
@@ -172,7 +172,7 @@ var _ = Describe("Logout", func() {
 	})
 })
 
-var _ = Describe("Authenticated", func() {
+var _ = Describe("AuthenticatedStage1", func() {
 	var (
 		session sessions.Session
 
@@ -211,7 +211,8 @@ var _ = Describe("Authenticated", func() {
 				session.Save()
 				context.Next()
 			})
-			httpRouter.Use(auth.Authenticated)
+
+			httpRouter.Use(auth.AuthenticatedStage1)
 			httpRouter.GET("/", func(context *gin.Context) {
 				context.JSON(200, true)
 			})
@@ -244,7 +245,7 @@ var _ = Describe("Authenticated", func() {
 
 	Context("When there is no token", func() {
 		BeforeEach(func() {
-			httpRouter.Use(auth.Authenticated)
+			httpRouter.Use(auth.AuthenticatedStage1)
 			httpRouter.GET("/", func(context *gin.Context) {
 				context.JSON(200, true)
 			})
@@ -308,18 +309,41 @@ var _ = Describe("Has Session", func() {
 		httpRouter.ServeHTTP(httpRecorder, req)
 	})
 
-	Context("When someone has a session", func() {
+	Context("When someone has a session without a validated postcode", func() {
 		BeforeEach(func() {
-			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
-				InstrumentName: instrumentName,
-				CaseID:         caseID,
-			}}, nil)
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
+				PostcodeValidated: false,
+				UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+				},
+			}, nil)
+		})
+
+		It("returns false and an empty claim", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(string(body)).To(Equal(`{"HasSession":false,"Claim":null}`))
+		})
+	})
+
+	Context("When someone has a session with a validated postcode", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
+				PostcodeValidated: true,
+				UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+				},
+			}, nil)
 		})
 
 		It("returns true and a claim", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.Bytes()
-			Expect(string(body)).To(Equal(`{"HasSession":true,"Claim":{"uac":"","instrument_name":"foobar","case_id":"fizzbuzz"}}`))
+			Expect(string(body)).To(Equal(
+				`{"HasSession":true,"Claim":{"uac":"","postcode_validated":true,"instrument_name":"foobar","case_id":"fizzbuzz"}}`,
+			))
 		})
 	})
 

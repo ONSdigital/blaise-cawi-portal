@@ -18,6 +18,8 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 	{
 		authGroup.GET("/login", authController.LoginEndpoint)
 		authGroup.POST("/login", authController.PostLoginEndpoint)
+		authGroup.GET("/login/postcode", authController.Auth.AuthenticatedStage1, authController.PostcodeEndpoint)
+		authGroup.POST("/login/postcode", authController.PostPostcodeEndpoint)
 		authGroup.GET("/logout", authController.LogoutEndpoint)
 	}
 }
@@ -35,6 +37,16 @@ func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
 	session := sessions.Default(context)
 
 	authController.Auth.Login(context, session)
+}
+
+func (authController *AuthController) PostcodeEndpoint(context *gin.Context) {
+	context.HTML(http.StatusOK, "postcode.tmpl", gin.H{})
+}
+
+func (authController *AuthController) PostPostcodeEndpoint(context *gin.Context) {
+	session := sessions.Default(context)
+
+	authController.Auth.LoginPostcode(context, session)
 }
 
 func (authController *AuthController) LogoutEndpoint(context *gin.Context) {
