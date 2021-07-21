@@ -21,6 +21,7 @@ const (
 )
 
 var expirationTime = "2h"
+
 // var expirationTime = "30s"
 
 //Generate mocks by running "go generate ./..."
@@ -112,7 +113,7 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 		notAuth(context)
 		return
 	}
-	context.HTML(http.StatusOK, "login.tmpl", gin.H{})
+	context.HTML(http.StatusOK, "logout.tmpl", gin.H{})
 	context.Abort()
 }
 
