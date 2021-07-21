@@ -12,6 +12,7 @@ import (
 //go:generate mockery --name JWTCryptoInterface
 type JWTCryptoInterface interface {
 	EncryptJWT(string, *busapi.UacInfo) (string, error)
+	EncryptValidatedPostcodeJWT(*UACClaims) (string, error)
 	DecryptJWT(interface{}) (*UACClaims, error)
 }
 
@@ -33,6 +34,13 @@ func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UacInfo) (str
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(jwtCrypto.JWTSecret))
+}
+
+func (jwtCrypto *JWTCrypto) EncryptValidatedPostcodeJWT(claim *UACClaims) (string, error) {
+	claim.PostcodeValidated = true
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
 	return token.SignedString([]byte(jwtCrypto.JWTSecret))
 }
 

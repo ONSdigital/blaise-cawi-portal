@@ -25,7 +25,7 @@ type InstrumentController struct {
 
 func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engine) {
 	instrumentRouter := httpRouter.Group("/:instrumentName")
-	instrumentRouter.Use(instrumentController.Auth.Authenticated)
+	instrumentRouter.Use(instrumentController.Auth.AuthenticatedStage2)
 	{
 		instrumentRouter.GET("/", func(context *gin.Context) {
 			instrumentController.openCase(context)

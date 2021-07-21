@@ -3,8 +3,9 @@ Inialising Go
 
 ![portal](./portal.gif)
 
-TODO: 
+TODO:
 - Instrument Controller
+    - Postcode auth tests
     - Edge case tests
     - Draw pretty picture for Ken
 
