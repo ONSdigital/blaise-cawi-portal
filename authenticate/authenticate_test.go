@@ -163,11 +163,11 @@ var _ = Describe("Logout", func() {
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		It("Clears the current session and renders the login page", func() {
+		It("Clears the current session and renders the log out confirmation page", func() {
 			Expect(session.Get("foobar")).To(BeNil())
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+			Expect(strings.Contains(string(body), `<h1>Your progress has been saved</h1>`)).To(BeTrue())
 		})
 	})
 })
