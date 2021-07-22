@@ -77,7 +77,7 @@ func (auth *Auth) AuthenticatedWithUacAndPostcode(context *gin.Context) {
 		notAuth(context)
 		return
 	}
-	if !claim.PostcodeValidated {
+	if claim == nil || !claim.PostcodeValidated {
 		notAuth(context)
 		return
 	}
@@ -101,6 +101,7 @@ func (auth *Auth) HasSession(context *gin.Context) (bool, *UACClaims) {
 
 func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	uac := context.PostForm("uac")
+	uac = strings.ReplaceAll(uac, " ", "")
 
 	if uac == "" {
 		NotAuthWithError(context, NO_ACCESS_CODE_ERR)
