@@ -159,6 +159,8 @@ func (auth *Auth) LoginPostcode(context *gin.Context, session sessions.Session) 
 		return
 	}
 	if !auth.ValidatePostcode(enteredPostcode, casePostcode) {
+		fmt.Println(enteredPostcode)
+		fmt.Println(casePostcode)
 		NotAuthWithError(context, POSTCODE_VALIDATION_ERR)
 		return
 	}

@@ -226,7 +226,7 @@ var _ = Describe("LoginPostcode", func() {
 		It("returns not authenticated", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
 		})
 	})
 
@@ -399,7 +399,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 			It("return unauthorized", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+				Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
 			})
 		})
 	})
@@ -415,7 +415,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 		It("return unauthorized", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
 		})
 	})
 })
@@ -478,7 +478,7 @@ var _ = Describe("AuthenticatedWithUacAndPostcode", func() {
 				It("return unauthorized", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+					Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
 				})
 			})
 
@@ -497,7 +497,7 @@ var _ = Describe("AuthenticatedWithUacAndPostcode", func() {
 				It("return unauthorized", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+					Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
 				})
 			})
 
@@ -529,7 +529,7 @@ var _ = Describe("AuthenticatedWithUacAndPostcode", func() {
 			It("return unauthorized", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+				Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
 			})
 		})
 	})
@@ -545,7 +545,7 @@ var _ = Describe("AuthenticatedWithUacAndPostcode", func() {
 		It("return unauthorized", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey</span>`)).To(BeTrue())
+			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
 		})
 	})
 })
