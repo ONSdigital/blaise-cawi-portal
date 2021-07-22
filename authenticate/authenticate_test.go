@@ -26,6 +26,7 @@ var _ = Describe("Login", func() {
 	var (
 		shortUAC  = "22222"
 		longUAC   = "1111222233334444"
+		spacedUAC = "1234 5678 9012"
 		validUAC  = "123456789012"
 		jwtCrypto = &authenticate.JWTCrypto{
 			JWTSecret: "hello",
@@ -113,6 +114,35 @@ var _ = Describe("Login", func() {
 			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
+		})
+	})
+
+	Context("Login with a valid UAC Code", func() {
+		BeforeEach(func() {
+			mockBusApi := &mocks.BusApiInterface{}
+			auth.BusApi = mockBusApi
+
+			mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+		})
+
+		JustBeforeEach(func() {
+			httpRecorder = httptest.NewRecorder()
+			data := url.Values{
+				"uac": []string{spacedUAC},
+			}
+			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			httpRouter.ServeHTTP(httpRecorder, req)
+		})
+
+		It("redirects to /auth/login/postcode", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusFound))
+			Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/auth/login/postcode"}))
+			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+			decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
+			Expect(decryptedToken.UAC).To(Equal(validUAC))
+			Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
+			Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
 		})
 	})
 

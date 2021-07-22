@@ -4,6 +4,9 @@
     {{ template "head_imports" }}
 </head>
 <body>
+<script>
+      document.body.className = ((document.body.className) ? document.body.className + ' js-enabled' : 'js-enabled');
+</script>
 <div class="page">
     <div class="page__content">
         <a class="skip__link" href="#main-content">Skip to main content</a>
@@ -28,37 +31,43 @@
                         </div>
                         {{ end }}
 
-                        <h1 class="u-mt-l">Validate postcode</h1>
-                        <form method="post" action="/auth/login/postcode">
+                        <h1 class="u-mt-l">What is your postcode?</h1>
+                        <form method="post" action="/auth/login/postcode" id="post-code-form">
 
-                            {{ if .error}}
-                            <div class="panel panel--error panel--no-title u-mb-s" id="number-of-employees-error">
-                                <span class="u-vh">Error: </span>
-                                <div class="panel__body">
-                                    <p class="panel__error">
-                                        <strong>{{ .error }}</strong>
-                                    </p>
-                                    {{ template "postcode_field" }}
-                                </div>
-                            </div>
-                            {{else}}
-                            {{ template "postcode_field" }}
-                            {{ end }}
-
-
-                            {{ define "postcode_field" }}
-                            <div class="field">
+                            <div class="field u-mb-m">
                                 <label class="label  " for="postcode">
                                     Postcode
                                 </label>
-                                <input type="text" id="postcode" class="input input--text input-type__input input--w-8"
-                                       autocomplete="postal-code" autofocus/>
+                                    <input type="text" id="postcode" class="input input--text input-type__input input--w-8"
+                                        autocomplete="postal-code" autofocus/>
                             </div>
-                            {{ end }}
 
-                            <button type="submit" class="btn u-mb-xl">
-                                <span class="btn__inner">Access survey</span>
-                            </button>
+                            <div id="collapsible-with-save" class="collapsible js-collapsible u-mb-l" data-btn-close="Hide this" data-save-state="true">
+                                <div class="collapsible__heading js-collapsible-heading">
+                                    <div class="collapsible__controls">
+                                    <h2 class="collapsible__title">Why do we ask this question?</h2>
+                                    <span class="collapsible__icon">
+                                        <svg class="svg-icon" viewBox="0 0 8 13" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                                        <path d="M5.74,14.28l-.57-.56a.5.5,0,0,1,0-.71h0l5-5-5-5a.5.5,0,0,1,0-.71h0l.57-.56a.5.5,0,0,1,.71,0h0l5.93,5.93a.5.5,0,0,1,0,.7L6.45,14.28a.5.5,0,0,1-.71,0Z" transform="translate(-5.02 -1.59)" />
+                                        </svg>
+                                    </span>
+                                    </div>
+                                </div>
+                                <div id="collapsible-with-save-content" class="collapsible__content js-collapsible-content">
+                                    <p>A typical photovoltaic system employs solar panels, each comprising a number of solar cells, which generate electrical power. PV installations may be ground-mounted, rooftop mounted or wall mounted. The mount may be fixed, or use a solar tracker to follow the sun across the sky.</p>
+                                    <button type="button" class="btn btn--small js-collapsible-button u-d-no btn--secondary" aria-hidden="true">
+                                    <span class="btn__inner js-collapsible-button-inner">Hide this</span>
+                                    <span class="btn__context u-vh">Why do we ask this question? undefined</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <button type="submit" type="submit" id="submit-btn"  class="btn btn-group__btn btn--loader js-loader js-submit-btn">
+                                    <span class="btn__inner">Continue
+                                        {{ template "btn_loading_svg" }}
+                                    </span>
+                                </button>
+                            </div>
                         </form>
                     </main>
                 </div>
