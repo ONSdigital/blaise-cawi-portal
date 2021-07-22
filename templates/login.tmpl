@@ -30,7 +30,7 @@
 
                         <h1 class="u-mt-l">Start survey</h1>
                         <form method="post" action="/auth/login">
-                            <div class="panel panel--{{ if .error}}error{{else}}info{{end}} panel--no-title u-mb-s">
+                            <div class="panel panel--{{ if .error}}error{{else}}info{{end}} panel--no-title u-mb-s" id="uac">
                                 <span class="u-vh">Important information: </span>
                                 <div class="panel__body">
 
@@ -47,14 +47,19 @@
                                         <span id="description-hint" class="label__description  input--with-description">
                                             Keep this code safe. You will need to enter it every time you access your survey
                                         </span>
-                                        <input type="text" id="uac"
+                                        <input type="text"
+                                               id="uac"
                                                class="input input--text input-type__input uac__input js-uac u-mb-xs"
-                                               name="uac" maxlength="19" data-group-size="4"
+                                               name="uac"
+                                               data-group-size="4"
+                                               maxlength="14"
                                                autocomplete="off"
                                                autofocus
-                                               autocapitalize="characters" aria-describedby="description-hint"/>
-                                        <a class="u-fs-s" href="#">Where to find your access
-                                            code</a>
+                                               autocapitalize="characters"
+                                               aria-describedby="description-hint"/>
+                                        <a class="u-fs-s" href="#">
+                                            Where to find your access code
+                                        </a>
                                     </div>
                                 </div>
                             </div>
