@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-{{ template "head_imports" }}
+    {{ template "head_imports" }}
 </head>
 <body>
 <div class="page">
@@ -22,7 +22,7 @@
                             </div>
                             <div class="panel__body">
                                 <p class="">
-                                    <a href="#uac" class="list__link js-inpagelink">{{ .error }}</a>
+                                    <a href="#postcode" class="list__link js-inpagelink">{{ .error }}</a>
                                 </p>
                             </div>
                         </div>
@@ -30,41 +30,32 @@
 
                         <h1 class="u-mt-l">Validate postcode</h1>
                         <form method="post" action="/auth/login/postcode">
-                            <div class="panel panel--{{ if .error}}error{{else}}info{{end}} panel--no-title u-mb-s">
-                                <span class="u-vh">Important information: </span>
-                                <div class="panel__body">
 
-                                    {{ if .error}}
+                            {{ if .error}}
+                            <div class="panel panel--error panel--no-title u-mb-s" id="number-of-employees-error">
+                                <span class="u-vh">Error: </span>
+                                <div class="panel__body">
                                     <p class="panel__error">
                                         <strong>{{ .error }}</strong>
                                     </p>
-                                    {{ end }}
+                                    {{ template "postcode_field" }}
+                                </div>
+                            </div>
+                            {{else}}
+                            {{ template "postcode_field" }}
+                            {{ end }}
 
-                                    <div class="field question__answer">
-                                        <label class="label  label--with-description " for="uac">
-                                            Enter your postcode
-                                        </label>
-                                        <input type="text" id="postcode"
-                                               class="input input--text input-type__input postcode__input js-postcode u-mb-xs"
-                                               name="postcode" maxlength="19" data-group-size="4"
-                                               autocomplete="off"
-                                               autofocus
-                                               autocapitalize="characters" aria-describedby="description-hint"/>
-                                    </div>
-                                </div>
+
+                            {{ define "postcode_field" }}
+                            <div class="field">
+                                <label class="label  " for="postcode">
+                                    Postcode
+                                </label>
+                                <input type="text" id="postcode" class="input input--text input-type__input input--w-8"
+                                       autocomplete="postal-code" autofocus/>
                             </div>
-                            <div class="panel panel--bare u-mb-s">
-                                    <span class="panel__icon u-fs-">
-                                      <svg class="svg-icon" viewBox="0 0 10 13" xmlns="http://www.w3.org/2000/svg"
-                                           focusable="false">
-                                        <path d="M12.25,6h-.72V4.49a3.5,3.5,0,0,0-7,0V6H3.75A.77.77,0,0,0,3,6.75v6.5a.77.77,0,0,0,.75.75h8.5a.77.77,0,0,0,.75-.75V6.75A.77.77,0,0,0,12.25,6ZM5.54,4.49a2.5,2.5,0,1,1,5,0V6h-5ZM9,11.66a.3.3,0,0,1-.26.34H7.29A.29.29,0,0,1,7,11.69v0l.39-1.82a1,1,0,1,1,1.4-.18.77.77,0,0,1-.18.18Z"
-                                              transform="translate(-3 -0.99)"/>
-                                      </svg>
-                                    </span>
-                                <div class="panel__body">
-                                    Your personal information is protected by law and will be kept confidential.
-                                </div>
-                            </div>
+                            {{ end }}
+
                             <button type="submit" class="btn u-mb-xl">
                                 <span class="btn__inner">Access survey</span>
                             </button>
