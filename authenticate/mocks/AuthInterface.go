@@ -16,13 +16,13 @@ type AuthInterface struct {
 	mock.Mock
 }
 
-// AuthenticatedStage1 provides a mock function with given fields: _a0
-func (_m *AuthInterface) AuthenticatedStage1(_a0 *gin.Context) {
+// AuthenticatedWithUac provides a mock function with given fields: _a0
+func (_m *AuthInterface) AuthenticatedWithUac(_a0 *gin.Context) {
 	_m.Called(_a0)
 }
 
-// AuthenticatedStage2 provides a mock function with given fields: _a0
-func (_m *AuthInterface) AuthenticatedStage2(_a0 *gin.Context) {
+// AuthenticatedWithUacAndPostcode provides a mock function with given fields: _a0
+func (_m *AuthInterface) AuthenticatedWithUacAndPostcode(_a0 *gin.Context) {
 	_m.Called(_a0)
 }
 

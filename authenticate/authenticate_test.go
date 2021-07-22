@@ -172,7 +172,7 @@ var _ = Describe("Logout", func() {
 	})
 })
 
-var _ = Describe("AuthenticatedStage1", func() {
+var _ = Describe("AuthenticatedWithUac", func() {
 	var (
 		session sessions.Session
 
@@ -212,7 +212,7 @@ var _ = Describe("AuthenticatedStage1", func() {
 				context.Next()
 			})
 
-			httpRouter.Use(auth.AuthenticatedStage1)
+			httpRouter.Use(auth.AuthenticatedWithUac)
 			httpRouter.GET("/", func(context *gin.Context) {
 				context.JSON(200, true)
 			})
@@ -245,7 +245,7 @@ var _ = Describe("AuthenticatedStage1", func() {
 
 	Context("When there is no token", func() {
 		BeforeEach(func() {
-			httpRouter.Use(auth.AuthenticatedStage1)
+			httpRouter.Use(auth.AuthenticatedWithUac)
 			httpRouter.GET("/", func(context *gin.Context) {
 				context.JSON(200, true)
 			})

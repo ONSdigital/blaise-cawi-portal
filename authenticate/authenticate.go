@@ -30,8 +30,8 @@ var expirationTime = "2h"
 //Generate mocks by running "go generate ./..."
 //go:generate mockery --name AuthInterface
 type AuthInterface interface {
-	AuthenticatedStage1(*gin.Context)
-	AuthenticatedStage2(*gin.Context)
+	AuthenticatedWithUac(*gin.Context)
+	AuthenticatedWithUacAndPostcode(*gin.Context)
 	Login(*gin.Context, sessions.Session)
 	LoginPostcode(*gin.Context, sessions.Session)
 	Logout(*gin.Context, sessions.Session)
@@ -44,8 +44,7 @@ type Auth struct {
 	BlaiseRestApi blaiserestapi.BlaiseRestApiInterface
 }
 
-// Is the user authenticated with a valid JWT?
-func (auth *Auth) AuthenticatedStage1(context *gin.Context) {
+func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
 	session := sessions.Default(context)
 	jwtToken := session.Get(JWT_TOKEN_KEY)
 
@@ -63,8 +62,7 @@ func (auth *Auth) AuthenticatedStage1(context *gin.Context) {
 	context.Next()
 }
 
-// Is the user authenticated with a valid JWT that has validated the postcode?
-func (auth *Auth) AuthenticatedStage2(context *gin.Context) {
+func (auth *Auth) AuthenticatedWithUacAndPostcode(context *gin.Context) {
 	session := sessions.Default(context)
 	jwtToken := session.Get(JWT_TOKEN_KEY)
 
