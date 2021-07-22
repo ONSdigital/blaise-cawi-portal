@@ -18,7 +18,7 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 	{
 		authGroup.GET("/login", authController.LoginEndpoint)
 		authGroup.POST("/login", authController.PostLoginEndpoint)
-		authGroup.GET("/login/postcode", authController.Auth.AuthenticatedStage1, authController.PostcodeEndpoint)
+		authGroup.GET("/login/postcode", authController.Auth.AuthenticatedWithUac, authController.PostcodeEndpoint)
 		authGroup.POST("/login/postcode", authController.PostPostcodeEndpoint)
 		authGroup.GET("/logout", authController.LogoutEndpoint)
 	}
