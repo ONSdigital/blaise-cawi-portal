@@ -19,7 +19,7 @@ const (
 	INVALID_LENGTH_ERR      = "Enter a 12-character access code"
 	NOT_RECOGNISED_ERR      = "Access code not recognised. Enter the code again"
 	INTERNAL_SERVER_ERR     = "We were unable to process your request, please try again"
-	POSTCODE_VALIDATION_ERR = "Postcode not regognised, please try again"
+	POSTCODE_VALIDATION_ERR = "Postcode not recognised, please try again"
 	ISSUER                  = "social-surveys-web-portal"
 )
 
