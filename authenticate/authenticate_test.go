@@ -257,7 +257,7 @@ var _ = Describe("LoginPostcode", func() {
 			It("returns not authenticated", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `Postcode not regognised, please try again`)).To(BeTrue())
+				Expect(strings.Contains(string(body), `Postcode not recognised, please try again`)).To(BeTrue())
 			})
 		})
 
@@ -274,7 +274,7 @@ var _ = Describe("LoginPostcode", func() {
 				It("returns not authenticated", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `Postcode not regognised, please try again`)).To(BeTrue())
+					Expect(strings.Contains(string(body), `Postcode not recognised, please try again`)).To(BeTrue())
 				})
 			})
 
