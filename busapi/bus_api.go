@@ -21,13 +21,6 @@ type BusApi struct {
 	Client  *http.Client
 }
 
-type UacInfo struct {
-	InstrumentName           string `json:"instrument_name"`
-	CaseID                   string `json:"case_id"`
-	PostcodeAttempts         int    `json:"postcode_attempts"`
-	PostcodeAttemptTimestamp string `json:"postcode_attempt_timestamp"`
-}
-
 type UACRequest struct {
 	UAC string `json:"uac"`
 }

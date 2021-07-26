@@ -14,17 +14,14 @@ import (
 )
 
 const (
-	JWT_TOKEN_KEY             = "jwt_token"
-	NO_ACCESS_CODE_ERR        = "Enter an access code"
-	INVALID_LENGTH_ERR        = "Enter a 12-character access code"
-	NOT_RECOGNISED_ERR        = "Access code not recognised. Enter the code again"
-	INTERNAL_SERVER_ERR       = "We were unable to process your request, please try again"
-	POSTCODE_VALIDATION_ERR   = "Postcode not recognised, please try again"
-	POSTCODE_ATTEMPT_ERR      = "This uac is currently locked due to repeated failed postcode attempts"
-	ISSUER                    = "social-surveys-web-portal"
-	MAX_POSTCODE_ATTEMPTS     = 5
-	POSTCODE_ATTEMPT_TIMEOUT  = time.Duration(30 * time.Minute)
-	POSTCODE_TIMESTAMP_FORMAT = "2006-01-02 15:04:05.999999999 -0700 MST"
+	JWT_TOKEN_KEY           = "jwt_token"
+	NO_ACCESS_CODE_ERR      = "Enter an access code"
+	INVALID_LENGTH_ERR      = "Enter a 12-character access code"
+	NOT_RECOGNISED_ERR      = "Access code not recognised. Enter the code again"
+	INTERNAL_SERVER_ERR     = "We were unable to process your request, please try again"
+	POSTCODE_VALIDATION_ERR = "Postcode not recognised, please try again"
+	POSTCODE_ATTEMPT_ERR    = "This uac is currently locked due to repeated failed postcode attempts"
+	ISSUER                  = "social-surveys-web-portal"
 )
 
 var expirationTime = "2h"
@@ -122,17 +119,15 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	if uacInfo.PostcodeAttempts >= MAX_POSTCODE_ATTEMPTS {
-		postcodeAttemptTimestamp, err := time.Parse(POSTCODE_TIMESTAMP_FORMAT, uacInfo.PostcodeAttemptTimestamp)
-		if err != nil {
-			log.Println(err)
-			NotAuthWithError(context, INTERNAL_SERVER_ERR)
-			return
-		}
-		if time.Now().UTC().Before(postcodeAttemptTimestamp.Add(POSTCODE_ATTEMPT_TIMEOUT)) {
-			NotAuthWithError(context, POSTCODE_ATTEMPT_ERR)
-			return
-		}
+	tooManyAttempts, err := uacInfo.TooManyUnexpiredAttempts()
+	if err != nil {
+		log.Println(err)
+		NotAuthWithError(context, INTERNAL_SERVER_ERR)
+		return
+	}
+	if tooManyAttempts {
+		NotAuthWithError(context, POSTCODE_ATTEMPT_ERR)
+		return
 	}
 
 	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo)
@@ -177,13 +172,13 @@ func (auth *Auth) LoginPostcode(context *gin.Context, session sessions.Session) 
 	}
 
 	if uacInfo.PostcodeAttempts > 0 {
-		postcodeAttemptTimestamp, err := time.Parse(POSTCODE_TIMESTAMP_FORMAT, uacInfo.PostcodeAttemptTimestamp)
+		postcodeAttemptsExpired, err := uacInfo.PostcodeAttemptsExpired()
 		if err != nil {
 			log.Println(err)
 			NotAuthPostcodeWithError(context, INTERNAL_SERVER_ERR)
 			return
 		}
-		if time.Now().UTC().After(postcodeAttemptTimestamp.Add(POSTCODE_ATTEMPT_TIMEOUT)) {
+		if postcodeAttemptsExpired {
 			uacInfo, err = auth.BusApi.ResetPostcodeAttempts(claim.UAC)
 			if err != nil {
 				log.Println(err)
@@ -193,7 +188,7 @@ func (auth *Auth) LoginPostcode(context *gin.Context, session sessions.Session) 
 		}
 	}
 
-	if uacInfo.PostcodeAttempts >= MAX_POSTCODE_ATTEMPTS {
+	if uacInfo.TooManyAttempts() {
 		NotAuthWithError(context, POSTCODE_ATTEMPT_ERR)
 		return
 	}
@@ -211,7 +206,7 @@ func (auth *Auth) LoginPostcode(context *gin.Context, session sessions.Session) 
 			NotAuthPostcodeWithError(context, INTERNAL_SERVER_ERR)
 			return
 		}
-		if uacInfo.PostcodeAttempts >= MAX_POSTCODE_ATTEMPTS {
+		if uacInfo.TooManyAttempts() {
 			NotAuthWithError(context, POSTCODE_ATTEMPT_ERR)
 			return
 		}
