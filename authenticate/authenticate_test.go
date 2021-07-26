@@ -633,7 +633,7 @@ var _ = Describe("Has Session", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.Bytes()
 			Expect(string(body)).To(Equal(
-				`{"HasSession":true,"Claim":{"uac":"","postcode_validated":true,"instrument_name":"foobar","case_id":"fizzbuzz"}}`,
+				`{"HasSession":true,"Claim":{"uac":"","postcode_validated":true,"instrument_name":"foobar","case_id":"fizzbuzz","postcode_attempts":0,"postcode_attempt_timestamp":""}}`,
 			))
 		})
 	})
