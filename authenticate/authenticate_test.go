@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	mockauth "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -50,6 +51,67 @@ var _ = Describe("Login", func() {
 		})
 	})
 
+	Context("When postcode attempts is over 5", func() {
+		Context("and the last attempt was within 30 minutes", func() {
+			BeforeEach(func() {
+				mockBusApi := &mocks.BusApiInterface{}
+				auth.BusApi = mockBusApi
+
+				postcodeAttemptTimestamp := time.Now().UTC().String()
+				mockBusApi.On("GetUacInfo", validUAC).Once().Return(
+					busapi.UacInfo{InstrumentName: "foo", CaseID: "bar", PostcodeAttempts: 5, PostcodeAttemptTimestamp: postcodeAttemptTimestamp}, nil)
+			})
+
+			JustBeforeEach(func() {
+				httpRecorder = httptest.NewRecorder()
+				data := url.Values{
+					"uac": []string{validUAC},
+				}
+				req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
+			It("returns a status unauthorised with an error", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+				Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
+				body := httpRecorder.Body.Bytes()
+				Expect(strings.Contains(string(body), `This uac is currently locked due to repeated failed postcode attempts`)).To(BeTrue())
+			})
+		})
+
+		Context("and the last attempt was over 30 minutes ago", func() {
+			BeforeEach(func() {
+				mockBusApi := &mocks.BusApiInterface{}
+				auth.BusApi = mockBusApi
+
+				postcodeAttemptTimestamp := time.Now().Add(time.Duration(-45 * time.Minute)).UTC().String()
+				mockBusApi.On("GetUacInfo", validUAC).Once().Return(
+					busapi.UacInfo{InstrumentName: "foo", CaseID: "bar", PostcodeAttempts: 5, PostcodeAttemptTimestamp: postcodeAttemptTimestamp}, nil)
+			})
+
+			JustBeforeEach(func() {
+				httpRecorder = httptest.NewRecorder()
+				data := url.Values{
+					"uac": []string{validUAC},
+				}
+				req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
+			It("redirects to /auth/login/postcode", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusFound))
+				Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/auth/login/postcode"}))
+				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+				decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
+				Expect(decryptedToken.UAC).To(Equal(validUAC))
+				Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
+				Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
+			})
+		})
+	})
+
 	Context("Login with a valid UAC Code", func() {
 		BeforeEach(func() {
 			mockBusApi := &mocks.BusApiInterface{}
@@ -62,6 +124,35 @@ var _ = Describe("Login", func() {
 			httpRecorder = httptest.NewRecorder()
 			data := url.Values{
 				"uac": []string{validUAC},
+			}
+			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			httpRouter.ServeHTTP(httpRecorder, req)
+		})
+
+		It("redirects to /auth/login/postcode", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusFound))
+			Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/auth/login/postcode"}))
+			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+			decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
+			Expect(decryptedToken.UAC).To(Equal(validUAC))
+			Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
+			Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
+		})
+	})
+
+	Context("Login with a valid UAC Code containing whitespace", func() {
+		BeforeEach(func() {
+			mockBusApi := &mocks.BusApiInterface{}
+			auth.BusApi = mockBusApi
+
+			mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+		})
+
+		JustBeforeEach(func() {
+			httpRecorder = httptest.NewRecorder()
+			data := url.Values{
+				"uac": []string{spacedUAC},
 			}
 			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -114,35 +205,6 @@ var _ = Describe("Login", func() {
 			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
-		})
-	})
-
-	Context("Login with a valid UAC Code", func() {
-		BeforeEach(func() {
-			mockBusApi := &mocks.BusApiInterface{}
-			auth.BusApi = mockBusApi
-
-			mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
-		})
-
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-			data := url.Values{
-				"uac": []string{spacedUAC},
-			}
-			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			httpRouter.ServeHTTP(httpRecorder, req)
-		})
-
-		It("redirects to /auth/login/postcode", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusFound))
-			Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/auth/login/postcode"}))
-			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-			decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-			Expect(decryptedToken.UAC).To(Equal(validUAC))
-			Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
-			Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
 		})
 	})
 
@@ -248,47 +310,146 @@ var _ = Describe("LoginPostcode", func() {
 			}, nil)
 		})
 
-		Context("when the user does not enter a postcode", func() {
-			BeforeEach(func() {
-				postcode = ""
-				mockRestApi.On("GetPostCode", instrumentName, caseID).Return("not yours", nil)
-			})
-
-			It("returns not authenticated", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `Postcode not recognised, please try again`)).To(BeTrue())
-			})
-		})
-
-		Context("when the user enters a postcode", func() {
-			BeforeEach(func() {
-				postcode = "NP10 8XG"
-			})
-
-			Context("and the postcode does not match", func() {
-				BeforeEach(func() {
-					mockRestApi.On("GetPostCode", instrumentName, caseID).Return("not yours", nil)
-				})
-
-				It("returns not authenticated", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `Postcode not recognised, please try again`)).To(BeTrue())
-				})
-			})
-
-			Context("and the postcode matches", func() {
+		Context("when the postcode has already had attempts", func() {
+			Context("and those attempts were over 30 minutes ago", func() {
 				BeforeEach(func() {
 					mockRestApi.On("GetPostCode", instrumentName, caseID).Return(postcode, nil)
 					mockJwtCrypto.On("EncryptValidatedPostcodeJWT", mock.Anything).Return("signedToken", nil)
+
+					postcodeAttemptTimestamp := time.Now().Add(time.Duration(-45 * time.Minute)).UTC().String()
+					mockBusApi.On("GetUacInfo", uac).Return(busapi.UacInfo{
+						PostcodeAttempts:         3,
+						PostcodeAttemptTimestamp: postcodeAttemptTimestamp,
+					}, nil)
+					mockBusApi.On("ResetPostcodeAttempts", uac).Return(busapi.UacInfo{}, nil)
 				})
 
-				It("redirects to /:instrumentName/", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusFound))
-					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foobar/"}))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(Equal("signedToken"))
+				It("resets the attempts before attempting to validate the postcode", func() {
+					mockRestApi.AssertNumberOfCalls(GinkgoT(), "GetPostCode", 1)
+					mockJwtCrypto.AssertNumberOfCalls(GinkgoT(), "EncryptValidatedPostcodeJWT", 1)
+					mockBusApi.AssertNumberOfCalls(GinkgoT(), "ResetPostcodeAttempts", 1)
+				})
+			})
+
+			Context("and those attempts were within 30 minutes", func() {
+				Context("and there were under 5 attempts", func() {
+					BeforeEach(func() {
+						mockRestApi.On("GetPostCode", instrumentName, caseID).Return("not yours", nil)
+						mockJwtCrypto.On("EncryptValidatedPostcodeJWT", mock.Anything).Return("signedToken", nil)
+
+						postcodeAttemptTimestamp := time.Now().UTC().String()
+						mockBusApi.On("GetUacInfo", uac).Return(busapi.UacInfo{
+							PostcodeAttempts:         3,
+							PostcodeAttemptTimestamp: postcodeAttemptTimestamp,
+						}, nil)
+						mockBusApi.On("ResetPostcodeAttempts", uac).Return(busapi.UacInfo{}, nil)
+					})
+
+					It("makes another attempt without resetting", func() {
+						mockRestApi.AssertNumberOfCalls(GinkgoT(), "GetPostCode", 1)
+						mockJwtCrypto.AssertNumberOfCalls(GinkgoT(), "EncryptValidatedPostcodeJWT", 0)
+						mockBusApi.AssertNumberOfCalls(GinkgoT(), "ResetPostcodeAttempts", 0)
+					})
+				})
+
+				Context("and there were 5 or more attempts", func() {
+					BeforeEach(func() {
+						mockRestApi.On("GetPostCode", instrumentName, caseID).Return(postcode, nil)
+						mockJwtCrypto.On("EncryptValidatedPostcodeJWT", mock.Anything).Return("signedToken", nil)
+
+						postcodeAttemptTimestamp := time.Now().UTC().String()
+						mockBusApi.On("GetUacInfo", uac).Return(busapi.UacInfo{
+							PostcodeAttempts:         5,
+							PostcodeAttemptTimestamp: postcodeAttemptTimestamp,
+						}, nil)
+						mockBusApi.On("ResetPostcodeAttempts", uac).Return(busapi.UacInfo{}, nil)
+					})
+
+					It("returns to the uac screen with a lockout error", func() {
+						mockRestApi.AssertNumberOfCalls(GinkgoT(), "GetPostCode", 0)
+						mockJwtCrypto.AssertNumberOfCalls(GinkgoT(), "EncryptValidatedPostcodeJWT", 0)
+						mockBusApi.AssertNumberOfCalls(GinkgoT(), "ResetPostcodeAttempts", 0)
+						Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+						body := httpRecorder.Body.String()
+						Expect(body).To(ContainSubstring(`This uac is currently locked due to repeated failed postcode attempts`))
+						Expect(body).To(ContainSubstring(`<span class="btn__inner">Access survey`))
+					})
+				})
+			})
+		})
+
+		Context("when the postcode has had no previous attempts", func() {
+			BeforeEach(func() {
+				mockBusApi.On("GetUacInfo", uac).Return(busapi.UacInfo{}, nil)
+			})
+
+			Context("when the user does not enter a postcode", func() {
+				BeforeEach(func() {
+					postcode = ""
+					mockRestApi.On("GetPostCode", instrumentName, caseID).Return("not yours", nil)
+					mockBusApi.On("IncrementPostcodeAttempts", uac).Return(busapi.UacInfo{}, nil)
+				})
+
+				It("returns not authenticated and increments attemps", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+					body := httpRecorder.Body.Bytes()
+					Expect(strings.Contains(string(body), `Postcode not recognised, please try again`)).To(BeTrue())
+					Expect(strings.Contains(string(body), `<span class="btn__inner">Continue`)).To(BeTrue())
+					mockBusApi.AssertNumberOfCalls(GinkgoT(), "IncrementPostcodeAttempts", 1)
+				})
+			})
+
+			Context("when the user enters a postcode", func() {
+				BeforeEach(func() {
+					postcode = "NP10 8XG"
+				})
+
+				Context("and the postcode does not match", func() {
+					BeforeEach(func() {
+						mockRestApi.On("GetPostCode", instrumentName, caseID).Return("not yours", nil)
+					})
+
+					Context("and there are under 5 attempts", func() {
+						BeforeEach(func() {
+							mockBusApi.On("IncrementPostcodeAttempts", uac).Return(busapi.UacInfo{PostcodeAttempts: 3}, nil)
+						})
+
+						It("returns not authenticated and stays on the postcode screen for an extra attempt", func() {
+							Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+							body := httpRecorder.Body.String()
+							Expect(body).To(ContainSubstring(`Postcode not recognised, please try again`))
+							Expect(body).To(ContainSubstring(`<span class="btn__inner">Continue`))
+							mockBusApi.AssertNumberOfCalls(GinkgoT(), "IncrementPostcodeAttempts", 1)
+						})
+					})
+
+					Context("and it is the 5th attempt", func() {
+						BeforeEach(func() {
+							mockBusApi.On("IncrementPostcodeAttempts", uac).Return(busapi.UacInfo{PostcodeAttempts: 5}, nil)
+						})
+
+						It("returns not authenticated on the uac screen and informs the user that the uac is locked", func() {
+							Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+							body := httpRecorder.Body.String()
+							Expect(body).To(ContainSubstring(`This uac is currently locked due to repeated failed postcode attempts`))
+							Expect(body).To(ContainSubstring(`<span class="btn__inner">Access survey`))
+						})
+					})
+				})
+
+				Context("and the postcode matches", func() {
+					BeforeEach(func() {
+						mockRestApi.On("GetPostCode", instrumentName, caseID).Return(postcode, nil)
+						mockJwtCrypto.On("EncryptValidatedPostcodeJWT", mock.Anything).Return("signedToken", nil)
+						mockBusApi.On("ResetPostcodeAttempts", uac).Return(busapi.UacInfo{}, nil)
+					})
+
+					It("redirects to /:instrumentName/", func() {
+						Expect(httpRecorder.Code).To(Equal(http.StatusFound))
+						Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foobar/"}))
+						Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+						Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(Equal("signedToken"))
+					})
 				})
 			})
 		})
