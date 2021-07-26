@@ -34,19 +34,21 @@
                         <h1 class="u-mt-l">What is your postcode?</h1>
                         <form method="post" action="/auth/login/postcode" id="post-code-form">
                         
-                        {{ if .error}}
-                        <div class="panel panel--error panel--no-title u-mb-s" id="number-of-employees-error">
-                            <span class="u-vh">Error: </span>
-                            <div class="panel__body">
-                              <p class="panel__error">
-                                <strong>{{ .error }}</strong>
-                              </p>
-                              {{ template "postcode_field" }}
+                        <div class="u-mb-m">
+                            {{ if .error}}
+                            <div class="panel panel--error panel--no-title u-mb-s" id="postcode">
+                                <span class="u-vh">Error: </span>
+                                <div class="panel__body">
+                                <p class="panel__error">
+                                    <strong>{{ .error }}</strong>
+                                </p>
+                                {{ template "postcode_field" }}
+                                </div>
                             </div>
+                            {{ else }}
+                                {{ template "postcode_field" }}
+                            {{ end }}
                         </div>
-                        {{ else }}
-                            {{ template "postcode_field" }}
-                        {{ end }}
 
                             <div id="collapsible-with-save" class="collapsible js-collapsible u-mb-l" data-btn-close="Hide this" data-save-state="true">
                                 <div class="collapsible__heading js-collapsible-heading">
@@ -85,7 +87,7 @@
 </body>
 
 {{ define "postcode_field" }}
-<div class="field u-mb-m">
+<div class="field">
     <label class="label  " for="postcode">
         Postcode
     </label>
