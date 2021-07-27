@@ -50,7 +50,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.Use(secure.Secure(secure.Options{
 		FrameDeny:          true,
 		ContentTypeNosniff: true,
-		BrowserXssFilter:   true,
 	}))
 	//This router has access to all templates in the templates folder
 	httpRouter.AppEngine = true
