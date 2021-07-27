@@ -14,7 +14,6 @@ import (
 	"github.com/gin-gonic/contrib/secure"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
-	csrf "github.com/utrack/gin-csrf"
 	"google.golang.org/api/idtoken"
 )
 
@@ -51,13 +50,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.Use(secure.Secure(secure.Options{
 		FrameDeny:          true,
 		ContentTypeNosniff: true,
-	}))
-	httpRouter.Use(csrf.Middleware(csrf.Options{
-		Secret: server.Config.SessionSecret,
-		ErrorFunc: func(c *gin.Context) {
-			c.String(400, "CSRF token mismatch")
-			c.Abort()
-		},
 	}))
 	//This router has access to all templates in the templates folder
 	httpRouter.AppEngine = true
