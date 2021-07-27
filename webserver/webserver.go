@@ -55,7 +55,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.AppEngine = true
 	httpRouter.LoadHTMLGlob("templates/*")
 
-	fmt.Println(server.Config)
 	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientId)
 	if err != nil {
 		fmt.Println(err)
