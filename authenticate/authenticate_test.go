@@ -17,7 +17,6 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
-	csrf "github.com/utrack/gin-csrf"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -46,12 +45,6 @@ var _ = Describe("Login", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
-		// Ignore CSRF errors for the purpose of these tests
-		httpRouter.Use(csrf.Middleware(csrf.Options{
-			Secret: "secret",
-			ErrorFunc: func(c *gin.Context) {
-			},
-		}))
 		httpRouter.POST("/login", func(context *gin.Context) {
 			session = sessions.Default(context)
 			auth.Login(context, session)
@@ -81,9 +74,7 @@ var _ = Describe("Login", func() {
 
 			It("returns a status unauthorised with an error", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-				decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-				Expect(decryptedToken).To(BeNil())
+				Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `This uac is currently locked due to repeated failed postcode attempts`)).To(BeTrue())
 			})
@@ -192,9 +183,7 @@ var _ = Describe("Login", func() {
 
 		It("returns a status unauthorised with an error", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-			decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-			Expect(decryptedToken).To(BeNil())
+			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
 		})
@@ -213,9 +202,7 @@ var _ = Describe("Login", func() {
 
 		It("returns a status unauthorised with an error", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-			decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-			Expect(decryptedToken).To(BeNil())
+			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
 		})
@@ -234,9 +221,7 @@ var _ = Describe("Login", func() {
 
 		It("returns a status unauthorised with an error", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-			decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-			Expect(decryptedToken).To(BeNil())
+			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `Enter an access code`)).To(BeTrue())
 		})
@@ -267,12 +252,6 @@ var _ = Describe("LoginPostcode", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
-		// Ignore CSRF errors for the purpose of these tests
-		httpRouter.Use(csrf.Middleware(csrf.Options{
-			Secret: "secret",
-			ErrorFunc: func(c *gin.Context) {
-			},
-		}))
 	})
 
 	AfterEach(func() {
@@ -490,12 +469,6 @@ var _ = Describe("Logout", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
-		// Ignore CSRF errors for the purpose of these tests
-		httpRouter.Use(csrf.Middleware(csrf.Options{
-			Secret: "secret",
-			ErrorFunc: func(c *gin.Context) {
-			},
-		}))
 		httpRouter.GET("/logout", func(context *gin.Context) {
 			session = sessions.Default(context)
 			session.Set("foobar", "fizzbuzz")
@@ -538,12 +511,6 @@ var _ = Describe("AuthenticatedWithUac", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
-		// Ignore CSRF errors for the purpose of these tests
-		httpRouter.Use(csrf.Middleware(csrf.Options{
-			Secret: "secret",
-			ErrorFunc: func(c *gin.Context) {
-			},
-		}))
 	})
 
 	AfterEach(func() {
@@ -634,12 +601,6 @@ var _ = Describe("AuthenticatedWithUacAndPostcode", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
-		// Ignore CSRF errors for the purpose of these tests
-		httpRouter.Use(csrf.Middleware(csrf.Options{
-			Secret: "secret",
-			ErrorFunc: func(c *gin.Context) {
-			},
-		}))
 	})
 
 	AfterEach(func() {
@@ -769,12 +730,6 @@ var _ = Describe("Has Session", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
-		// Ignore CSRF errors for the purpose of these tests
-		httpRouter.Use(csrf.Middleware(csrf.Options{
-			Secret: "secret",
-			ErrorFunc: func(c *gin.Context) {
-			},
-		}))
 
 		httpRouter.Use(func(context *gin.Context) {
 			session = sessions.Default(context)
