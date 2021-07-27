@@ -196,6 +196,8 @@ func (auth *Auth) LoginPostcode(context *gin.Context, session sessions.Session) 
 	casePostcode, err := auth.BlaiseRestApi.GetPostCode(claim.UacInfo.InstrumentName, claim.UacInfo.CaseID)
 	if err != nil {
 		log.Println(err)
+		log.Printf("Instrument: %s\n", claim.UacInfo.InstrumentName)
+		log.Printf("Case: %s", claim.UacInfo.CaseID)
 		NotAuthPostcodeWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}
