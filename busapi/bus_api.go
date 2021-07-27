@@ -80,7 +80,7 @@ func (busApi *BusApi) doGetUacInfo(uac string) (*http.Response, error) {
 	uacRequest := UACRequest{UAC: uac}
 	uacJSON, err := json.Marshal(uacRequest)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to Marshal error")
+		return nil, fmt.Errorf("unable to Marshal error")
 	}
 
 	request, err := http.NewRequest("POST", busApi.getUACInfoUrl(),
@@ -98,7 +98,7 @@ func (busApi *BusApi) doResetPostcodeAttempts(uac string) (*http.Response, error
 	uacRequest := UACRequest{UAC: uac}
 	uacJSON, err := json.Marshal(uacRequest)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to Marshal error")
+		return nil, fmt.Errorf("unable to Marshal error")
 	}
 
 	request, err := http.NewRequest("DELETE", busApi.postcodeAttemptsUrl(),
@@ -116,7 +116,7 @@ func (busApi *BusApi) doIncrementPostcodeAttempts(uac string) (*http.Response, e
 	uacRequest := UACRequest{UAC: uac}
 	uacJSON, err := json.Marshal(uacRequest)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to Marshal error")
+		return nil, fmt.Errorf("unable to Marshal error")
 	}
 
 	request, err := http.NewRequest("POST", busApi.postcodeAttemptsUrl(),
@@ -133,14 +133,14 @@ func (busApi *BusApi) doIncrementPostcodeAttempts(uac string) (*http.Response, e
 func (busApi *BusApi) marshalUacResponse(response *http.Response) (UacInfo, error) {
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return UacInfo{}, fmt.Errorf("Unable to read body")
+		return UacInfo{}, fmt.Errorf("unable to read body")
 	}
 	defer response.Body.Close()
 
 	var uacInfo UacInfo
 	err = json.Unmarshal(body, &uacInfo)
 	if err != nil {
-		return UacInfo{}, fmt.Errorf("Unable To Unmarshal Json")
+		return UacInfo{}, fmt.Errorf("unable To Unmarshal Json")
 	}
 	return uacInfo, nil
 }

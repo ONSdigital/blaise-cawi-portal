@@ -78,7 +78,7 @@ var _ = Describe("Auth Controller", func() {
 			It("returns a temporary redirect response", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusTemporaryRedirect))
 
-				header := httpRecorder.HeaderMap["Location"]
+				header := httpRecorder.Header()["Location"]
 				Expect(header).To(Equal([]string{fmt.Sprintf("/%s/", instrumentName)}))
 			})
 		})

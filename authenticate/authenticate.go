@@ -254,7 +254,7 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 func (auth *Auth) ValidatePostcode(enteredPostcode, casePostcode string) bool {
 	enteredPostcode = strings.ReplaceAll(enteredPostcode, " ", "")
 	casePostcode = strings.ReplaceAll(casePostcode, " ", "")
-	return strings.ToLower(enteredPostcode) == strings.ToLower(casePostcode)
+	return strings.EqualFold(enteredPostcode, casePostcode)
 }
 
 func notAuth(context *gin.Context) {

@@ -51,7 +51,7 @@ var _ = Describe("BUS API", func() {
 
 			It("Returns a an error and an empty uac info struct", func() {
 				uacInfo, err := busApi.GetUacInfo(uac)
-				Expect(err).To(MatchError("Unable To Unmarshal Json"))
+				Expect(err).To(MatchError("unable To Unmarshal Json"))
 				Expect(uacInfo.InstrumentName).To(Equal(""))
 				Expect(uacInfo.CaseID).To(Equal(""))
 			})
@@ -82,7 +82,7 @@ var _ = Describe("BUS API", func() {
 
 			It("Returns a an error and an empty uac info struct", func() {
 				uacInfo, err := busApi.IncrementPostcodeAttempts(uac)
-				Expect(err).To(MatchError("Unable To Unmarshal Json"))
+				Expect(err).To(MatchError("unable To Unmarshal Json"))
 				Expect(uacInfo.InstrumentName).To(Equal(""))
 				Expect(uacInfo.CaseID).To(Equal(""))
 				Expect(uacInfo.PostcodeAttempts).To(Equal(0))
@@ -114,7 +114,7 @@ var _ = Describe("BUS API", func() {
 
 			It("Returns a an error and an empty uac info struct", func() {
 				uacInfo, err := busApi.ResetPostcodeAttempts(uac)
-				Expect(err).To(MatchError("Unable To Unmarshal Json"))
+				Expect(err).To(MatchError("unable To Unmarshal Json"))
 				Expect(uacInfo.InstrumentName).To(Equal(""))
 				Expect(uacInfo.CaseID).To(Equal(""))
 				Expect(uacInfo.PostcodeAttempts).To(Equal(0))

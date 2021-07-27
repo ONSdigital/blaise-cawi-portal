@@ -31,7 +31,7 @@ func (blaiseRestApi *BlaiseRestApi) GetPostCode(instrumentName, caseID string) (
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return "", fmt.Errorf("Case not found")
+		return "", fmt.Errorf("case not found")
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
