@@ -19,7 +19,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
-	csrf "github.com/utrack/gin-csrf"
 )
 
 var _ = Describe("Open Case", func() {
@@ -41,12 +40,6 @@ var _ = Describe("Open Case", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
-		// Ignore CSRF errors for the purpose of these tests
-		httpRouter.Use(csrf.Middleware(csrf.Options{
-			Secret: "secret",
-			ErrorFunc: func(c *gin.Context) {
-			},
-		}))
 		instrumentController.AddRoutes(httpRouter)
 		httpmock.Activate()
 	})

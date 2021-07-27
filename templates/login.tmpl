@@ -30,7 +30,6 @@
 
                         <h1 class="u-mt-l">Start survey</h1>
                         <form method="post" action="/auth/login">
-                            <input type="hidden" name="_csrf" value="{{ .csrfToken }}" />
                             <div class="panel panel--{{ if .error}}error{{else}}info{{end}} panel--no-title u-mb-s" id="uac">
                                 <span class="u-vh">Important information: </span>
                                 <div class="panel__body">
