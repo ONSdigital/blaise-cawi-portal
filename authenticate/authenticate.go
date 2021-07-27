@@ -115,6 +115,9 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
 	if err != nil || uacInfo.InstrumentName == "" || uacInfo.CaseID == "" {
+		log.Println(err)
+		log.Printf("Instrument: %s\n", uacInfo.InstrumentName)
+		log.Printf("Case: %s\n", uacInfo.CaseID)
 		NotAuthWithError(context, NOT_RECOGNISED_ERR)
 		return
 	}
@@ -197,7 +200,7 @@ func (auth *Auth) LoginPostcode(context *gin.Context, session sessions.Session) 
 	if err != nil {
 		log.Println(err)
 		log.Printf("Instrument: %s\n", claim.UacInfo.InstrumentName)
-		log.Printf("Case: %s", claim.UacInfo.CaseID)
+		log.Printf("Case: %s\n", claim.UacInfo.CaseID)
 		NotAuthPostcodeWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}
