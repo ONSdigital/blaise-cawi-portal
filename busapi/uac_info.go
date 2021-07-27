@@ -31,7 +31,7 @@ func (uacInfo UacInfo) PostcodeAttemptsExpired() (bool, error) {
 }
 
 func (uacInfo UacInfo) TooManyUnexpiredAttempts() (bool, error) {
-	if uacInfo.PostcodeAttempts < MAX_POSTCODE_ATTEMPTS {
+	if !uacInfo.TooManyAttempts() {
 		return false, nil
 	}
 	expired, err := uacInfo.PostcodeAttemptsExpired()
