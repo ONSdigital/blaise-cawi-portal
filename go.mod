@@ -13,5 +13,6 @@ require (
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.10.1
 	github.com/stretchr/testify v1.6.1
+	github.com/utrack/gin-csrf v0.0.0-20190424104817-40fb8d2c8fca
 	google.golang.org/api v0.50.0
 )
