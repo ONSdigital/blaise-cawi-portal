@@ -12,6 +12,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/stretchr/testify/mock"
+	csrf "github.com/utrack/gin-csrf"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo"
@@ -31,6 +32,12 @@ var _ = Describe("Auth Controller", func() {
 		httpRouter = gin.Default()
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
+		// Ignore CSRF errors for the purpose of these tests
+		httpRouter.Use(csrf.Middleware(csrf.Options{
+			Secret: "secret",
+			ErrorFunc: func(c *gin.Context) {
+			},
+		}))
 		httpRouter.LoadHTMLGlob("../templates/*")
 		authController.AddRoutes(httpRouter)
 	})

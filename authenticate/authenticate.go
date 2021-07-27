@@ -11,6 +11,7 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	csrf "github.com/utrack/gin-csrf"
 )
 
 const (
@@ -258,17 +259,17 @@ func (auth *Auth) ValidatePostcode(enteredPostcode, casePostcode string) bool {
 }
 
 func notAuth(context *gin.Context) {
-	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{})
+	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{"csrfToken": csrf.GetToken(context)})
 	context.Abort()
 }
 
 func NotAuthWithError(context *gin.Context, errorMessage string) {
-	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{"error": errorMessage})
+	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{"error": errorMessage, "csrfToken": csrf.GetToken(context)})
 	context.Abort()
 }
 
 func NotAuthPostcodeWithError(context *gin.Context, errorMessage string) {
-	context.HTML(http.StatusUnauthorized, "postcode.tmpl", gin.H{"error": errorMessage})
+	context.HTML(http.StatusUnauthorized, "postcode.tmpl", gin.H{"error": errorMessage, "csrfToken": csrf.GetToken(context)})
 	context.Abort()
 }
 
