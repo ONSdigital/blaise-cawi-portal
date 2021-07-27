@@ -7,6 +7,7 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	csrf "github.com/utrack/gin-csrf"
 )
 
 type AuthController struct {
@@ -30,7 +31,7 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 		context.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/%s/", claim.UacInfo.InstrumentName))
 		return
 	}
-	context.HTML(http.StatusOK, "login.tmpl", gin.H{})
+	context.HTML(http.StatusOK, "login.tmpl", gin.H{"csrfToken": csrf.GetToken(context)})
 }
 
 func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
@@ -40,7 +41,7 @@ func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
 }
 
 func (authController *AuthController) PostcodeEndpoint(context *gin.Context) {
-	context.HTML(http.StatusOK, "postcode.tmpl", gin.H{})
+	context.HTML(http.StatusOK, "postcode.tmpl", gin.H{"csrfToken": csrf.GetToken(context)})
 }
 
 func (authController *AuthController) PostPostcodeEndpoint(context *gin.Context) {
