@@ -11,6 +11,7 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-gonic/contrib/secure"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
 	"google.golang.org/api/idtoken"
@@ -46,6 +47,11 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
 	httpRouter.Use(sessions.Sessions("session", store))
+	httpRouter.Use(secure.Secure(secure.Options{
+		FrameDeny:          true,
+		ContentTypeNosniff: true,
+		BrowserXssFilter:   true,
+	}))
 	//This router has access to all templates in the templates folder
 	httpRouter.AppEngine = true
 	httpRouter.LoadHTMLGlob("templates/*")
