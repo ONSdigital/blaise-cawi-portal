@@ -47,6 +47,11 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpClient := &http.Client{}
 
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
+	store.Options(sessions.Options{
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
 	httpRouter.Use(sessions.Sessions("session", store))
 	httpRouter.Use(secure.Secure(secure.Options{
 		FrameDeny:          true,
