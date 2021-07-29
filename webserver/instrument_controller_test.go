@@ -310,3 +310,43 @@ var _ = Describe("Open Case", func() {
 		})
 	})
 })
+
+var _ = Describe("GET /:instrumentName/logout", func() {
+	var (
+		httpRouter           *gin.Engine
+		mockAuth             = &mocks.AuthInterface{}
+		instrumentController = &webserver.InstrumentController{Auth: mockAuth}
+		instrumentName       = "foobar"
+	)
+
+	BeforeEach(func() {
+		httpRouter = gin.Default()
+		store := cookie.NewStore([]byte("secret"))
+		httpRouter.Use(sessions.Sessions("mysession", store))
+		httpRouter.LoadHTMLGlob("../templates/*")
+		instrumentController.AddRoutes(httpRouter)
+	})
+
+	AfterEach(func() {
+		mockAuth = &mocks.AuthInterface{}
+		instrumentController = &webserver.InstrumentController{Auth: mockAuth}
+	})
+
+	var (
+		httpRecorder *httptest.ResponseRecorder
+	)
+
+	BeforeEach(func() {
+		mockAuth.On("Logout", mock.Anything, mock.Anything).Return()
+	})
+
+	JustBeforeEach(func() {
+		httpRecorder = httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/logout", instrumentName), nil)
+		httpRouter.ServeHTTP(httpRecorder, req)
+	})
+
+	It("calls it auth.logout", func() {
+		mockAuth.AssertNumberOfCalls(GinkgoT(), "Logout", 1)
+	})
+})
