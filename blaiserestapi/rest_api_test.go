@@ -41,7 +41,7 @@ var _ = Describe("Blaise rest api endpoints", func() {
 
 			It("returns a NotFound error", func() {
 				postcodeRespose, err := blaiseRestApi.GetPostCode(instrumentName, caseID)
-				Expect(err).To(MatchError("Case not found"))
+				Expect(err).To(MatchError("case not found"))
 				Expect(postcodeRespose).To(BeEmpty())
 			})
 		})

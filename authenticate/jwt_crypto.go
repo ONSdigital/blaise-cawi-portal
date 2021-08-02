@@ -46,7 +46,7 @@ func (jwtCrypto *JWTCrypto) EncryptValidatedPostcodeJWT(claim *UACClaims) (strin
 
 func (jwtCrypto *JWTCrypto) DecryptJWT(jwtToken interface{}) (*UACClaims, error) {
 	if jwtToken == nil {
-		return nil, fmt.Errorf("No JWT Token in session")
+		return nil, fmt.Errorf("no JWT Token in session")
 	}
 	token, err := jwt.ParseWithClaims(jwtToken.(string), &UACClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(jwtCrypto.JWTSecret), nil

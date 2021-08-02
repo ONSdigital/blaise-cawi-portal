@@ -27,26 +27,19 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 	instrumentRouter := httpRouter.Group("/:instrumentName")
 	instrumentRouter.Use(instrumentController.Auth.AuthenticatedWithUacAndPostcode)
 	{
-		instrumentRouter.GET("/", func(context *gin.Context) {
-			instrumentController.openCase(context)
-		})
+		instrumentRouter.GET("/", instrumentController.openCase)
 		// Example path /dst2101a/resources/js/jskdjasjdlkasjld.js
 		// instrumentName = dst2101a
 		// path = resources
 		// resource = /js/jskdjasjdlkasjld.js
-		instrumentRouter.GET("/:path/*resource", func(context *gin.Context) {
-			instrumentController.proxyGet(context)
-		})
+		instrumentRouter.GET("/:path/*resource", instrumentController.proxyGet)
 		// Above root would only match /dst2101a/resources/*
 		// We have to add this to additonally match /dst2101a/resources
-		instrumentRouter.GET("/:path", func(context *gin.Context) {
-			instrumentController.proxyGet(context)
-		})
-
-		instrumentRouter.POST("/*path", func(context *gin.Context) {
-			instrumentController.proxyPost(context)
-		})
+		instrumentRouter.GET("/:path", instrumentController.proxyGet)
+		instrumentRouter.POST("/*path", instrumentController.proxyPost)
 	}
+
+	httpRouter.GET("/:instrumentName/logout", instrumentController.logoutEndpoint)
 }
 
 func (instrumentController *InstrumentController) instrumentAuth(context *gin.Context) (*authenticate.UACClaims, error) {
@@ -194,6 +187,12 @@ func (instrumentController *InstrumentController) proxyPoster(context *gin.Conte
 	}
 	defer resp.Body.Close()
 	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+}
+
+func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Context) {
+	session := sessions.Default(context)
+
+	instrumentController.Auth.Logout(context, session)
 }
 
 func addHeaders(req *http.Request, context *gin.Context) {

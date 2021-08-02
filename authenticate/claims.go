@@ -15,9 +15,9 @@ type UACClaims struct {
 }
 
 func (uacClaims *UACClaims) AuthenticatedForInstrument(instrumentName string) bool {
-	return strings.ToLower(uacClaims.UacInfo.InstrumentName) == strings.ToLower(instrumentName)
+	return strings.EqualFold(uacClaims.UacInfo.InstrumentName, instrumentName)
 }
 
 func (uacClaims *UACClaims) AuthenticatedForCase(caseID string) bool {
-	return strings.ToLower(uacClaims.UacInfo.CaseID) == strings.ToLower(caseID)
+	return strings.EqualFold(uacClaims.UacInfo.CaseID, caseID)
 }
