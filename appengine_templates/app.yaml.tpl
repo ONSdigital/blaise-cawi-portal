@@ -16,7 +16,7 @@ vpc_access_connector:
 
 basic_scaling:
   idle_timeout: 60s
-  max_instances: 1
+  max_instances: 10
 
 instance_class: B4
 
