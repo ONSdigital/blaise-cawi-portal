@@ -4,7 +4,7 @@ import "time"
 
 const (
 	MAX_POSTCODE_ATTEMPTS     = 5
-	POSTCODE_ATTEMPT_TIMEOUT  = time.Duration(30 * time.Minute)
+	POSTCODE_ATTEMPT_TIMEOUT  = time.Duration(10 * time.Minute)
 	POSTCODE_TIMESTAMP_FORMAT = "2006-01-02 15:04:05.999999999 -0700 MST"
 )
 
