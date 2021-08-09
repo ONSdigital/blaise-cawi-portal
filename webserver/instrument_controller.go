@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -141,11 +142,12 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	proxy.Director = func(req *http.Request) {
-		req.Header = context.Request.Header
 		req.Host = remote.Host
 		req.URL.Scheme = remote.Scheme
 		req.URL.Host = remote.Host
 		req.URL.Path = fmt.Sprintf("%s/%s%s", uacClaim.InstrumentName, path, resource)
+		log.Printf("Request Host: %s\n", req.Host)
+		log.Printf("Request URL: %s://%s/%s", req.URL.Host, req.URL.Scheme, req.URL.Path)
 	}
 	proxy.ServeHTTP(context.Writer, context.Request)
 }
