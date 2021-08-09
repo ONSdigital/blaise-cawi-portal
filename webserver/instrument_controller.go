@@ -139,7 +139,7 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
 	// Only enable this when debugging
-	proxy.Transport = debugTransport{}
+	// proxy.Transport = debugTransport{}
 
 	proxy.ServeHTTP(context.Writer, context.Request)
 }
