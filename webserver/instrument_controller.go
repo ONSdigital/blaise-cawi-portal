@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -142,10 +141,6 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 	// Only enable this when debugging
 	proxy.Transport = debugTransport{}
 
-	proxy.Director = func(req *http.Request) {
-		req.Host = remote.Hostname()
-		log.Printf("Request Host: %s\n", req.Host)
-	}
 	proxy.ServeHTTP(context.Writer, context.Request)
 }
 
