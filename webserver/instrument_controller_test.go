@@ -21,13 +21,34 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// A response recorder that supports streams (for efficent proxying)
+type TestResponseRecorder struct {
+	*httptest.ResponseRecorder
+	closeChannel chan bool
+}
+
+func (r *TestResponseRecorder) CloseNotify() <-chan bool {
+	return r.closeChannel
+}
+
+func (r *TestResponseRecorder) closeClient() {
+	r.closeChannel <- true
+}
+
+func CreateTestResponseRecorder() *TestResponseRecorder {
+	return &TestResponseRecorder{
+		httptest.NewRecorder(),
+		make(chan bool, 1),
+	}
+}
+
 var _ = Describe("Open Case", func() {
 	var (
 		catiUrl              = "http://localhost"
 		instrumentName       = "foobar"
 		caseID               = "fizzbuzz"
 		httpRouter           *gin.Engine
-		httpRecorder         *httptest.ResponseRecorder
+		httpRecorder         *TestResponseRecorder
 		responseInfo         = "hello"
 		mockAuth             = &mocks.AuthInterface{}
 		mockJWTCrypto        = &mocks.JWTCryptoInterface{}
@@ -65,7 +86,7 @@ var _ = Describe("Open Case", func() {
 				}}, nil)
 				instrumentController.Auth = mockAuth
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
@@ -87,7 +108,7 @@ var _ = Describe("Open Case", func() {
 					CaseID:         caseID,
 				}}, nil)
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", "fwibble"), nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
@@ -105,7 +126,7 @@ var _ = Describe("Open Case", func() {
 				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(nil, errors.New("No JWT"))
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
@@ -127,7 +148,7 @@ var _ = Describe("Open Case", func() {
 					CaseID:         caseID,
 				}}, nil)
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
@@ -151,7 +172,7 @@ var _ = Describe("Open Case", func() {
 					CaseID:         caseID,
 				}}, nil)
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble/dwibble/qwibble", instrumentName), nil)
 				req.Header.Add("Content-Type", "application/json")
 				req.Header.Add("Connection", "foobar")
@@ -175,7 +196,7 @@ var _ = Describe("Open Case", func() {
 					CaseID:         caseID,
 				}}, nil)
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble", instrumentName), nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
@@ -183,28 +204,6 @@ var _ = Describe("Open Case", func() {
 			It("Returns a 200 response and some data", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 				Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
-			})
-		})
-
-		Context("When a proxies get returns a non 200 status code", func() {
-			JustBeforeEach(func() {
-				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
-					httpmock.NewJsonResponderOrPanic(404, responseInfo))
-
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
-				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
-					InstrumentName: instrumentName,
-					CaseID:         caseID,
-				}}, nil)
-
-				httpRecorder = httptest.NewRecorder()
-				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble", instrumentName), nil)
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			It("gets wrapped by an internal server error", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusInternalServerError))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<h1>Sorry, there is a problem with the service</h1>`))
 			})
 		})
 
@@ -219,7 +218,7 @@ var _ = Describe("Open Case", func() {
 					CaseID:         caseID,
 				}}, nil)
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/fwibble", "notMyInstrument"), nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
@@ -247,7 +246,7 @@ var _ = Describe("Open Case", func() {
 
 				requestBody = bytes.NewReader([]byte(`{"foo":"bar"}`))
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("POST", fmt.Sprintf("/%s/fwibble", instrumentName), requestBody)
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
@@ -279,7 +278,7 @@ var _ = Describe("Open Case", func() {
 						}
 					}`, requestedCaseID)))
 
-				httpRecorder = httptest.NewRecorder()
+				httpRecorder = CreateTestResponseRecorder()
 				req, _ := http.NewRequest("POST", fmt.Sprintf("/%s/api/application/start_interview", instrumentName), requestBody)
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
@@ -333,7 +332,7 @@ var _ = Describe("GET /:instrumentName/logout", func() {
 	})
 
 	var (
-		httpRecorder *httptest.ResponseRecorder
+		httpRecorder *TestResponseRecorder
 	)
 
 	BeforeEach(func() {
@@ -341,7 +340,7 @@ var _ = Describe("GET /:instrumentName/logout", func() {
 	})
 
 	JustBeforeEach(func() {
-		httpRecorder = httptest.NewRecorder()
+		httpRecorder = CreateTestResponseRecorder()
 		req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/logout", instrumentName), nil)
 		httpRouter.ServeHTTP(httpRecorder, req)
 	})
