@@ -141,6 +141,10 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
+
+	// Only enable this when debugging
+	proxy.Transport = debugTransport{}
+
 	proxy.Director = func(req *http.Request) {
 		req.Host = remote.Hostname()
 		req.URL.Scheme = remote.Scheme
@@ -156,4 +160,15 @@ func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Co
 	session := sessions.Default(context)
 
 	instrumentController.Auth.Logout(context, session)
+}
+
+type debugTransport struct{}
+
+func (debugTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	b, err := httputil.DumpRequestOut(r, false)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(string(b))
+	return http.DefaultTransport.RoundTrip(r)
 }
