@@ -109,13 +109,7 @@ func (instrumentController *InstrumentController) proxyGet(context *gin.Context)
 		InternalServerError(context)
 		return
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		InternalServerError(context)
-		return
-	}
-	defer resp.Body.Close()
-	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+	context.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, nil)
 }
 
 func (instrumentController *InstrumentController) proxyPost(context *gin.Context) {
@@ -128,21 +122,24 @@ func (instrumentController *InstrumentController) proxyPost(context *gin.Context
 	if path == "/api/application/start_interview" {
 		instrumentController.proxyStartInterview(context, path, uacClaim)
 	} else {
-		requestBody, err := ioutil.ReadAll(context.Request.Body)
+		body, err := ioutil.ReadAll(context.Request.Body)
 		if err != nil {
+			log.Println(err.Error())
 			InternalServerError(context)
 			return
 		}
 		instrumentController.proxyPoster(context,
 			fmt.Sprintf("%s/%s%s", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path),
-			bytes.NewBuffer(requestBody),
+			bytes.NewReader(body),
 		)
 	}
 }
 
 func (instrumentController *InstrumentController) proxyStartInterview(context *gin.Context, path string, uacClaim *authenticate.UACClaims) {
 	var startInterview blaise.StartInterview
-	startInterviewBody, err := ioutil.ReadAll(context.Request.Body)
+	var buffer bytes.Buffer
+	startInterviewTee := io.TeeReader(context.Request.Body, &buffer)
+	startInterviewBody, err := ioutil.ReadAll(startInterviewTee)
 	if err != nil {
 		fmt.Println(err)
 		InternalServerError(context)
@@ -162,7 +159,7 @@ func (instrumentController *InstrumentController) proxyStartInterview(context *g
 	}
 	instrumentController.proxyPoster(context,
 		fmt.Sprintf("%s/%s%s", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path),
-		bytes.NewBuffer(startInterviewBody),
+		&buffer,
 	)
 }
 
@@ -180,13 +177,7 @@ func (instrumentController *InstrumentController) proxyPoster(context *gin.Conte
 		InternalServerError(context)
 		return
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		InternalServerError(context)
-		return
-	}
-	defer resp.Body.Close()
-	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+	context.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, nil)
 }
 
 func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Context) {
