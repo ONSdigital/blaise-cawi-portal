@@ -95,15 +95,15 @@ func (instrumentController *InstrumentController) proxyWithInstrumentAuth(contex
 	}
 	path := context.Param("path")
 	resource := context.Param("resource")
-	if fmt.Sprintf("/%s%s", path, resource) == "/api/application/start_interview" {
-		if instrumentController.startInterviewAuth(context, path, uacClaim) {
+	if isStartInterviewUrl(path, resource) {
+		if instrumentController.startInterviewAuth(context, uacClaim) {
 			return
 		}
 	}
 	instrumentController.proxy(context, uacClaim)
 }
 
-func (instrumentController *InstrumentController) startInterviewAuth(context *gin.Context, path string, uacClaim *authenticate.UACClaims) bool {
+func (instrumentController *InstrumentController) startInterviewAuth(context *gin.Context, uacClaim *authenticate.UACClaims) bool {
 	var startInterview blaise.StartInterview
 	var buffer bytes.Buffer
 	startInterviewTee := io.TeeReader(context.Request.Body, &buffer)
@@ -148,6 +148,10 @@ func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Co
 	session := sessions.Default(context)
 
 	instrumentController.Auth.Logout(context, session)
+}
+
+func isStartInterviewUrl(path, resource string) bool {
+	return fmt.Sprintf("/%s%s", path, resource) == "/api/application/start_interview"
 }
 
 type debugTransport struct{}
