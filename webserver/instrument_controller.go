@@ -131,9 +131,6 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 }
 
 func (instrumentController *InstrumentController) proxy(context *gin.Context, uacClaim *authenticate.UACClaims) {
-	path := context.Param("path")
-	resource := context.Param("resource")
-
 	remote, err := url.Parse(instrumentController.CatiUrl)
 	if err != nil {
 		InternalServerError(context)
@@ -147,11 +144,7 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 
 	proxy.Director = func(req *http.Request) {
 		req.Host = remote.Hostname()
-		req.URL.Scheme = remote.Scheme
-		req.URL.Host = remote.Host
-		req.URL.Path = fmt.Sprintf("%s/%s%s", uacClaim.InstrumentName, path, resource)
 		log.Printf("Request Host: %s\n", req.Host)
-		log.Printf("Request URL: %s://%s%s", req.URL.Scheme, req.URL.Host, req.URL.Path)
 	}
 	proxy.ServeHTTP(context.Writer, context.Request)
 }
