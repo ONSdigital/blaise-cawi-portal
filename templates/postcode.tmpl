@@ -33,18 +33,22 @@
 
                         <h1 class="u-mt-l">What is your postcode?</h1>
                         <form method="post" action="/auth/login/postcode" id="post-code-form">
-
-                            <div class="field u-mb-m">
-                                <label class="label  " for="postcode">
-                                    Postcode
-                                </label>
-                                    <input type="text"
-                                        id="postcode"
-                                        name="postcode"
-                                        class="input input--text input-type__input input--w-8"
-                                        autocomplete="postal-code"
-                                        autofocus/>
+                        
+                        <div class="u-mb-m">
+                            {{ if .error}}
+                            <div class="panel panel--error panel--no-title u-mb-s" id="postcode">
+                                <span class="u-vh">Error: </span>
+                                <div class="panel__body">
+                                <p class="panel__error">
+                                    <strong>{{ .error }}</strong>
+                                </p>
+                                {{ template "postcode_field" }}
+                                </div>
                             </div>
+                            {{ else }}
+                                {{ template "postcode_field" }}
+                            {{ end }}
+                        </div>
 
                             <div id="collapsible-with-save" class="collapsible js-collapsible u-mb-l" data-btn-close="Hide this" data-save-state="true">
                                 <div class="collapsible__heading js-collapsible-heading">
@@ -81,4 +85,19 @@
     </div>
 </div>
 </body>
+
+{{ define "postcode_field" }}
+<div class="field">
+    <label class="label  " for="postcode">
+        Postcode
+    </label>
+        <input type="text"
+            id="postcode"
+            name="postcode"
+            class="input input--text input-type__input input--w-8"
+            autocomplete="postal-code"
+            autofocus/>
+</div>
+{{ end }}
+
 </html>
