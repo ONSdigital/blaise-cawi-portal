@@ -33,7 +33,7 @@
 
                         <h1 class="u-mt-l">What is your postcode?</h1>
                         <form method="post" action="/auth/login/postcode" id="post-code-form">
-                        
+
                         <div class="u-mb-m">
                             {{ if .error}}
                             <div class="panel panel--error panel--no-title u-mb-s" id="postcode">
@@ -95,7 +95,7 @@
             id="postcode"
             name="postcode"
             class="input input--text input-type__input input--w-8"
-            autocomplete="postal-code"
+            autocomplete="off"
             autofocus/>
 </div>
 {{ end }}

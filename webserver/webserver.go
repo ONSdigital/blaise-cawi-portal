@@ -9,12 +9,22 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/gin-contrib/secure"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
-	"github.com/gin-gonic/contrib/secure"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
 	"google.golang.org/api/idtoken"
+)
+
+const CDN = "https://cdn.ons.gov.uk"
+
+var (
+	srcHosts              = fmt.Sprintf("'self' %s", CDN)
+	defaultSRC            = fmt.Sprintf("default-src %s 'unsafe-inline'", srcHosts)
+	fontSRC               = fmt.Sprintf("font-src %s data:", srcHosts)
+	imgSRC                = fmt.Sprintf("img-src %s data:", srcHosts)
+	contentSecurityPolicy = fmt.Sprintf("%s; %s; %s", defaultSRC, fontSRC, imgSRC)
 )
 
 type Config struct {
@@ -45,12 +55,21 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter := gin.Default()
 	httpClient := &http.Client{}
 
+	securityConfig := secure.DefaultConfig()
+	securityConfig.ContentSecurityPolicy = contentSecurityPolicy
+	httpRouter.Use(secure.New(securityConfig))
+
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   2 * 60 * 60,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
 	httpRouter.Use(sessions.Sessions("session", store))
-	httpRouter.Use(secure.Secure(secure.Options{
-		FrameDeny:          true,
-		ContentTypeNosniff: true,
-	}))
+
 	//This router has access to all templates in the templates folder
 	httpRouter.AppEngine = true
 	httpRouter.LoadHTMLGlob("templates/*")
@@ -83,6 +102,11 @@ func (server *Server) SetupRouter() *gin.Engine {
 	authController := &AuthController{
 		Auth: auth,
 	}
+
+	securityController := &SecurityController{}
+
+	securityController.AddRoutes(httpRouter)
+
 	authController.AddRoutes(httpRouter)
 	instrumentController := &InstrumentController{
 		Auth:       auth,
@@ -99,5 +123,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.NoRoute(func(context *gin.Context) {
 		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{})
 	})
+
 	return httpRouter
 }

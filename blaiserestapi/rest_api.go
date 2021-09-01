@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 )
 
@@ -39,6 +40,11 @@ func (blaiseRestApi *BlaiseRestApi) GetPostCode(instrumentName, caseID string) (
 	}
 	var postcode string
 	err = json.Unmarshal(body, &postcode)
+	if err != nil {
+		log.Printf("Postcode request url: '%s'", blaiseRestApi.postCodeUrl(instrumentName, caseID))
+		log.Printf("Postcode response code: '%v'", resp.StatusCode)
+		log.Printf("Get postcode body: '%s'", string(body))
+	}
 	return postcode, err
 }
 
