@@ -5,7 +5,6 @@ Inialising Go
 
 TODO:
 - Instrument Controller
-    - Postcode auth tests
     - Edge case tests
     - Draw pretty picture for Ken
 
@@ -13,5 +12,4 @@ TODO:
     - Can we do anything nicer with timed out sessions?
 
 
-- Post code will require auth stage 1
 - everything else will require auth stage 2
