@@ -27,6 +27,7 @@ type InstrumentController struct {
 
 func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engine) {
 	instrumentRouter := httpRouter.Group("/:instrumentName")
+	instrumentRouter.Use(instrumentController.Auth.AuthenticatedWithUac)
 	{
 		instrumentRouter.GET("/", instrumentController.openCase)
 		// Example path /dst2101a/resources/js/jskdjasjdlkasjld.js
