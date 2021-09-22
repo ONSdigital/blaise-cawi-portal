@@ -79,7 +79,7 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
@@ -102,7 +102,7 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
@@ -123,7 +123,7 @@ var _ = Describe("Open Case", func() {
 
 		Context("Invalid responses from opening a case in Blaise", func() {
 			JustBeforeEach(func() {
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(nil, errors.New("No JWT"))
 
 				httpRecorder = CreateTestResponseRecorder()
@@ -142,7 +142,7 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(500, "Sad face"))
 
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
@@ -166,7 +166,7 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble/dwibble/qwibble", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
@@ -190,7 +190,7 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
@@ -212,7 +212,7 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, "notMyInstrument"),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
@@ -238,7 +238,7 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
@@ -264,7 +264,7 @@ var _ = Describe("Open Case", func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/api/application/start_interview", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, responseInfo))
 
-				mockAuth.On("AuthenticatedWithUacAndPostcode", mock.Anything).Return()
+				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,

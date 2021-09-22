@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
-	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/gin-contrib/secure"
 	"github.com/gin-contrib/sessions"
@@ -34,7 +33,6 @@ type Config struct {
 	JWTSecret        string `required:"true" split_words:"true"`
 	BusUrl           string `required:"true" split_words:"true"`
 	BusClientId      string `required:"true" split_words:"true"`
-	BlaiseRestApi    string `required:"true" split_words:"true"`
 	Serverpark       string `default:"gusty"`
 	Port             string `default:"8080"`
 }
@@ -80,12 +78,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 		os.Exit(1)
 	}
 
-	blaiseRestAPI := &blaiserestapi.BlaiseRestApi{
-		BaseUrl:    server.Config.BlaiseRestApi,
-		Serverpark: server.Config.Serverpark,
-		Client:     httpClient,
-	}
-
 	jwtCrypto := &authenticate.JWTCrypto{
 		JWTSecret: server.Config.JWTSecret,
 	}
@@ -96,7 +88,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 			BaseUrl: server.Config.BusUrl,
 			Client:  client,
 		},
-		BlaiseRestApi: blaiseRestAPI,
 	}
 
 	authController := &AuthController{
