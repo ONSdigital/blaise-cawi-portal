@@ -9,7 +9,6 @@ import (
 
 type UACClaims struct {
 	UAC               string `json:"uac"`
-	PostcodeValidated bool   `json:"postcode_validated"`
 	busapi.UacInfo
 	jwt.StandardClaims
 }
