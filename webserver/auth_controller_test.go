@@ -69,7 +69,7 @@ var _ = Describe("Auth Controller", func() {
 				mockAuth.On("HasSession", mock.Anything).Return(true, &authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
-				}, PostcodeValidated: true}, nil)
+				},}, nil)
 
 				req, _ := http.NewRequest("GET", "/auth/login", nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
@@ -101,46 +101,6 @@ var _ = Describe("Auth Controller", func() {
 
 		It("calls it auth.login", func() {
 			mockAuth.AssertNumberOfCalls(GinkgoT(), "Login", 1)
-		})
-	})
-
-	Describe("GET /auth/login/postcode", func() {
-		var (
-			httpRecorder *httptest.ResponseRecorder
-		)
-
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-
-			mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
-
-			req, _ := http.NewRequest("GET", "/auth/login/postcode", nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
-		})
-
-		It("returns the postcode entry page", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Continue`))
-		})
-	})
-
-	Describe("POST /auth/login/postcode", func() {
-		var (
-			httpRecorder *httptest.ResponseRecorder
-		)
-
-		BeforeEach(func() {
-			mockAuth.On("LoginPostcode", mock.Anything, mock.Anything).Return()
-		})
-
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("POST", "/auth/login/postcode", nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
-		})
-
-		It("calls it auth.loginPostcode", func() {
-			mockAuth.AssertNumberOfCalls(GinkgoT(), "LoginPostcode", 1)
 		})
 	})
 

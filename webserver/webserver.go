@@ -7,14 +7,23 @@ import (
 	"os"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
-	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/gin-contrib/secure"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
-	"github.com/gin-gonic/contrib/secure"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
 	"google.golang.org/api/idtoken"
+)
+
+const CDN = "https://cdn.ons.gov.uk"
+
+var (
+	srcHosts              = fmt.Sprintf("'self' %s", CDN)
+	defaultSRC            = fmt.Sprintf("default-src %s 'unsafe-inline'", srcHosts)
+	fontSRC               = fmt.Sprintf("font-src %s data:", srcHosts)
+	imgSRC                = fmt.Sprintf("img-src %s data:", srcHosts)
+	contentSecurityPolicy = fmt.Sprintf("%s; %s; %s", defaultSRC, fontSRC, imgSRC)
 )
 
 type Config struct {
@@ -24,7 +33,6 @@ type Config struct {
 	JWTSecret        string `required:"true" split_words:"true"`
 	BusUrl           string `required:"true" split_words:"true"`
 	BusClientId      string `required:"true" split_words:"true"`
-	BlaiseRestApi    string `required:"true" split_words:"true"`
 	Serverpark       string `default:"gusty"`
 	Port             string `default:"8080"`
 }
@@ -45,12 +53,21 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter := gin.Default()
 	httpClient := &http.Client{}
 
+	securityConfig := secure.DefaultConfig()
+	securityConfig.ContentSecurityPolicy = contentSecurityPolicy
+	httpRouter.Use(secure.New(securityConfig))
+
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   2 * 60 * 60,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
 	httpRouter.Use(sessions.Sessions("session", store))
-	httpRouter.Use(secure.Secure(secure.Options{
-		FrameDeny:          true,
-		ContentTypeNosniff: true,
-	}))
+
 	//This router has access to all templates in the templates folder
 	httpRouter.AppEngine = true
 	httpRouter.LoadHTMLGlob("templates/*")
@@ -59,12 +76,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
-	}
-
-	blaiseRestAPI := &blaiserestapi.BlaiseRestApi{
-		BaseUrl:    server.Config.BlaiseRestApi,
-		Serverpark: server.Config.Serverpark,
-		Client:     httpClient,
 	}
 
 	jwtCrypto := &authenticate.JWTCrypto{
@@ -77,12 +88,16 @@ func (server *Server) SetupRouter() *gin.Engine {
 			BaseUrl: server.Config.BusUrl,
 			Client:  client,
 		},
-		BlaiseRestApi: blaiseRestAPI,
 	}
 
 	authController := &AuthController{
 		Auth: auth,
 	}
+
+	securityController := &SecurityController{}
+
+	securityController.AddRoutes(httpRouter)
+
 	authController.AddRoutes(httpRouter)
 	instrumentController := &InstrumentController{
 		Auth:       auth,
@@ -99,5 +114,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.NoRoute(func(context *gin.Context) {
 		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{})
 	})
+
 	return httpRouter
 }
