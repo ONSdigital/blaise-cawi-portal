@@ -102,7 +102,8 @@ var _ = Describe("Auth Controller", func() {
 			})
 
 			It("gives an auth error", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusBadRequest))
+				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
 			})
 		})
 
@@ -114,7 +115,8 @@ var _ = Describe("Auth Controller", func() {
 			})
 
 			It("gives an auth error", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusBadRequest))
+				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
 			})
 		})
 
