@@ -37,6 +37,7 @@ type Config struct {
 	BusClientId      string `required:"true" split_words:"true"`
 	Serverpark       string `default:"gusty"`
 	Port             string `default:"8080"`
+	DevMode          bool   `default:"false" split_words:"true"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -57,8 +58,11 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	securityConfig := secure.DefaultConfig()
 	securityConfig.ContentSecurityPolicy = contentSecurityPolicy
-	securityConfig.IsDevelopment = true
 	httpRouter.Use(secure.New(securityConfig))
+
+	if server.Config.DevMode {
+		securityConfig.IsDevelopment = true
+	}
 
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
 	store.Options(sessions.Options{

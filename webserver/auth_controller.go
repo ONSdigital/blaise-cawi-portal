@@ -20,7 +20,7 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 	authGroup.Use(csrf.Middleware(csrf.Options{
 		Secret: authController.CSRFSecret,
 		ErrorFunc: func(context *gin.Context) {
-			context.String(400, "CSRF token mismatch")
+			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{"error": "Something went wrong, please try again"})
 			context.Abort()
 		},
 	}))
