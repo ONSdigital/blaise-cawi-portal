@@ -10,8 +10,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	// "strings"
-
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
 	"github.com/gin-contrib/sessions"
@@ -48,7 +46,7 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
 	uacClaim, err := instrumentController.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
-		authenticate.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
+		instrumentController.Auth.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
 		return nil, err
 	}
 	instrumentName := context.Param("instrumentName")
