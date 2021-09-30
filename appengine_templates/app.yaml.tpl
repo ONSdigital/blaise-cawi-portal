@@ -14,11 +14,12 @@ env_variables:
 vpc_access_connector:
   name: projects/_PROJECT_ID/locations/europe-west2/connectors/vpcconnect
 
-basic_scaling:
-  idle_timeout: 60s
-  max_instances: 10
+automatic_scaling:
+  max_instances: 50
+  min_instances: 1
+  max_concurrent_requests: 40
 
-instance_class: B4
+instance_class: F2
 
 handlers:
 - url: /.*

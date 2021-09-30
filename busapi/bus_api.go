@@ -12,8 +12,6 @@ import (
 //go:generate mockery --name BusApiInterface
 type BusApiInterface interface {
 	GetUacInfo(string) (UacInfo, error)
-	IncrementPostcodeAttempts(string) (UacInfo, error)
-	ResetPostcodeAttempts(string) (UacInfo, error)
 }
 
 type BusApi struct {
@@ -38,40 +36,8 @@ func (busApi *BusApi) GetUacInfo(uac string) (UacInfo, error) {
 	return busApi.marshalUacResponse(response)
 }
 
-func (busApi *BusApi) IncrementPostcodeAttempts(uac string) (UacInfo, error) {
-	response, err := busApi.doIncrementPostcodeAttempts(uac)
-	if err != nil {
-		return UacInfo{}, err
-	}
-
-	if response.StatusCode == http.StatusNotFound {
-		return UacInfo{}, nil
-	}
-
-	return busApi.marshalUacResponse(response)
-}
-
-func (busApi *BusApi) ResetPostcodeAttempts(uac string) (UacInfo, error) {
-	response, err := busApi.doResetPostcodeAttempts(uac)
-	if err != nil {
-		return UacInfo{}, err
-	}
-
-	if response.StatusCode == http.StatusNotFound {
-		return UacInfo{}, nil
-	}
-
-	return busApi.marshalUacResponse(response)
-}
-
 func (busApi *BusApi) getUACInfoUrl() (url string) {
 	return fmt.Sprintf("%s/uacs/uac",
-		busApi.BaseUrl,
-	)
-}
-
-func (busApi *BusApi) postcodeAttemptsUrl() (url string) {
-	return fmt.Sprintf("%s/uacs/uac/postcode/attempts",
 		busApi.BaseUrl,
 	)
 }
@@ -84,42 +50,6 @@ func (busApi *BusApi) doGetUacInfo(uac string) (*http.Response, error) {
 	}
 
 	request, err := http.NewRequest("POST", busApi.getUACInfoUrl(),
-		bytes.NewReader(uacJSON),
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return busApi.Client.Do(request)
-}
-
-func (busApi *BusApi) doResetPostcodeAttempts(uac string) (*http.Response, error) {
-	uacRequest := UACRequest{UAC: uac}
-	uacJSON, err := json.Marshal(uacRequest)
-	if err != nil {
-		return nil, fmt.Errorf("unable to Marshal error")
-	}
-
-	request, err := http.NewRequest("DELETE", busApi.postcodeAttemptsUrl(),
-		bytes.NewReader(uacJSON),
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return busApi.Client.Do(request)
-}
-
-func (busApi *BusApi) doIncrementPostcodeAttempts(uac string) (*http.Response, error) {
-	uacRequest := UACRequest{UAC: uac}
-	uacJSON, err := json.Marshal(uacRequest)
-	if err != nil {
-		return nil, fmt.Errorf("unable to Marshal error")
-	}
-
-	request, err := http.NewRequest("POST", busApi.postcodeAttemptsUrl(),
 		bytes.NewReader(uacJSON),
 	)
 

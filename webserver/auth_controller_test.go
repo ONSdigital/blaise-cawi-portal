@@ -12,6 +12,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/stretchr/testify/mock"
+	csrf "github.com/utrack/gin-csrf"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo"
@@ -22,7 +23,7 @@ var _ = Describe("Auth Controller", func() {
 	var (
 		httpRouter     *gin.Engine
 		mockAuth       = &mocks.AuthInterface{}
-		authController = &webserver.AuthController{Auth: mockAuth}
+		authController = &webserver.AuthController{Auth: mockAuth, CSRFSecret: "fwibble"}
 		instrumentName = "foobar"
 		caseID         = "fizzbuzz"
 	)
@@ -69,7 +70,7 @@ var _ = Describe("Auth Controller", func() {
 				mockAuth.On("HasSession", mock.Anything).Return(true, &authenticate.UACClaims{UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
-				}, PostcodeValidated: true}, nil)
+				}}, nil)
 
 				req, _ := http.NewRequest("GET", "/auth/login", nil)
 				httpRouter.ServeHTTP(httpRecorder, req)
@@ -93,54 +94,58 @@ var _ = Describe("Auth Controller", func() {
 			mockAuth.On("Login", mock.Anything, mock.Anything).Return()
 		})
 
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("POST", "/auth/login", nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
+		Context("without a CSRF", func() {
+			JustBeforeEach(func() {
+				httpRecorder = httptest.NewRecorder()
+				req, _ := http.NewRequest("POST", "/auth/login", nil)
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
+			It("gives an auth error", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
+			})
 		})
 
-		It("calls it auth.login", func() {
-			mockAuth.AssertNumberOfCalls(GinkgoT(), "Login", 1)
-		})
-	})
+		Context("with an invalid CSRF", func() {
+			JustBeforeEach(func() {
+				httpRecorder = httptest.NewRecorder()
+				req, _ := http.NewRequest("POST", "/auth/login?_csrf=dalajksdqoosk", nil)
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
 
-	Describe("GET /auth/login/postcode", func() {
-		var (
-			httpRecorder *httptest.ResponseRecorder
-		)
-
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-
-			mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
-
-			req, _ := http.NewRequest("GET", "/auth/login/postcode", nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
+			It("gives an auth error", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
+			})
 		})
 
-		It("returns the postcode entry page", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Continue`))
-		})
-	})
+		Context("with a valid CSRF", func() {
+			var csrfToken string
 
-	Describe("POST /auth/login/postcode", func() {
-		var (
-			httpRecorder *httptest.ResponseRecorder
-		)
+			JustBeforeEach(func() {
+				httpRouter.GET("/token", func(context *gin.Context) {
+					context.Set("csrfSecret", authController.CSRFSecret)
+					csrfToken = csrf.GetToken(context)
+				})
 
-		BeforeEach(func() {
-			mockAuth.On("LoginPostcode", mock.Anything, mock.Anything).Return()
-		})
+				req1, _ := http.NewRequest("GET", "/token", nil)
 
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("POST", "/auth/login/postcode", nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
-		})
+				httpRecorder = httptest.NewRecorder()
+				httpRouter.ServeHTTP(httpRecorder, req1)
 
-		It("calls it auth.loginPostcode", func() {
-			mockAuth.AssertNumberOfCalls(GinkgoT(), "LoginPostcode", 1)
+				req2, _ := http.NewRequest("POST", fmt.Sprintf("/auth/login?_csrf=%s", csrfToken), nil)
+				req2.Header.Set("Cookie", httpRecorder.Header().Get("Set-Cookie"))
+				req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+				httpRecorder = httptest.NewRecorder()
+				httpRouter.ServeHTTP(httpRecorder, req2)
+			})
+
+			It("calls it auth.login", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+				mockAuth.AssertNumberOfCalls(GinkgoT(), "Login", 1)
+			})
 		})
 	})
 
