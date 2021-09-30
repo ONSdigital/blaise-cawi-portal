@@ -12,6 +12,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/csrf"
 	"github.com/kelseyhightower/envconfig"
 	"google.golang.org/api/idtoken"
 )
@@ -24,6 +25,7 @@ var (
 	fontSRC               = fmt.Sprintf("font-src %s data:", srcHosts)
 	imgSRC                = fmt.Sprintf("img-src %s data:", srcHosts)
 	contentSecurityPolicy = fmt.Sprintf("%s; %s; %s", defaultSRC, fontSRC, imgSRC)
+	csrfMiddleware        func(http.Handler) http.Handler
 )
 
 type Config struct {
@@ -35,6 +37,7 @@ type Config struct {
 	BusClientId      string `required:"true" split_words:"true"`
 	Serverpark       string `default:"gusty"`
 	Port             string `default:"8080"`
+	DevMode          bool   `default:"false" split_words:"true"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -57,6 +60,10 @@ func (server *Server) SetupRouter() *gin.Engine {
 	securityConfig.ContentSecurityPolicy = contentSecurityPolicy
 	httpRouter.Use(secure.New(securityConfig))
 
+	if server.Config.DevMode {
+		securityConfig.IsDevelopment = true
+	}
+
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
 	store.Options(sessions.Options{
 		Path:     "/",
@@ -65,6 +72,8 @@ func (server *Server) SetupRouter() *gin.Engine {
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 	})
+
+	csrfMiddleware = csrf.Protect([]byte(server.Config.SessionSecret))
 
 	httpRouter.Use(sessions.Sessions("session", store))
 
