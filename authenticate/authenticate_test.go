@@ -119,7 +119,8 @@ var _ = Describe("Login", func() {
 
 		It("returns a status unauthorised with an error", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
+			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+			Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
 		})
@@ -138,7 +139,8 @@ var _ = Describe("Login", func() {
 
 		It("returns a status unauthorised with an error", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
+			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+			Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
 		})
@@ -157,7 +159,8 @@ var _ = Describe("Login", func() {
 
 		It("returns a status unauthorised with an error", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-			Expect(httpRecorder.Result().Cookies()).To(BeEmpty())
+			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+			Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `Enter an access code`)).To(BeTrue())
 		})
