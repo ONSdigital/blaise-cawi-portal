@@ -12,7 +12,6 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/csrf"
 	"github.com/kelseyhightower/envconfig"
 	"google.golang.org/api/idtoken"
 )
@@ -25,7 +24,6 @@ var (
 	fontSRC               = fmt.Sprintf("font-src %s data:", srcHosts)
 	imgSRC                = fmt.Sprintf("img-src %s data:", srcHosts)
 	contentSecurityPolicy = fmt.Sprintf("%s; %s; %s", defaultSRC, fontSRC, imgSRC)
-	csrfMiddleware        func(http.Handler) http.Handler
 )
 
 type Config struct {
@@ -73,8 +71,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	csrfMiddleware = csrf.Protect([]byte(server.Config.SessionSecret))
-
 	httpRouter.Use(sessions.Sessions("session", store))
 
 	//This router has access to all templates in the templates folder
@@ -97,10 +93,12 @@ func (server *Server) SetupRouter() *gin.Engine {
 			BaseUrl: server.Config.BusUrl,
 			Client:  client,
 		},
+		CSRFSecret: server.Config.SessionSecret,
 	}
 
 	authController := &AuthController{
 		Auth: auth,
+		CSRFSecret: server.Config.SessionSecret,
 	}
 
 	securityController := &SecurityController{}
