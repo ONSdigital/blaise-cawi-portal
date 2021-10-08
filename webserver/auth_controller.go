@@ -13,6 +13,7 @@ import (
 type AuthController struct {
 	Auth       authenticate.AuthInterface
 	CSRFSecret string
+	UacKind    string
 }
 
 func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
