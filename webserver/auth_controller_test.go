@@ -23,7 +23,10 @@ var _ = Describe("Auth Controller", func() {
 	var (
 		httpRouter     *gin.Engine
 		mockAuth       = &mocks.AuthInterface{}
-		authController = &webserver.AuthController{Auth: mockAuth, CSRFSecret: "fwibble"}
+		authController = &webserver.AuthController{
+			Auth: mockAuth,
+			CSRFSecret: "fwibble",
+			UacKind: "uac"}
 		instrumentName = "foobar"
 		caseID         = "fizzbuzz"
 	)

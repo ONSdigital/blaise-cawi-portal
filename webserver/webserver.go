@@ -35,6 +35,7 @@ type Config struct {
 	BusClientId      string `required:"true" split_words:"true"`
 	Serverpark       string `default:"gusty"`
 	Port             string `default:"8080"`
+	UacKind          string `default:"uac" split_words:"true"`
 	DevMode          bool   `default:"false" split_words:"true"`
 }
 
@@ -94,10 +95,11 @@ func (server *Server) SetupRouter() *gin.Engine {
 			Client:  client,
 		},
 		CSRFSecret: server.Config.SessionSecret,
+		UacKind:    server.Config.UacKind,
 	}
 
 	authController := &AuthController{
-		Auth: auth,
+		Auth:       auth,
 		CSRFSecret: server.Config.SessionSecret,
 	}
 
