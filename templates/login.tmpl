@@ -42,7 +42,11 @@
 
                                     <div class="field question__answer">
                                         <label class="label  label--with-description " for="uac">
-                                            Enter your 12-character access code
+                                            {{if .uac16}}
+                                                Enter your 16-character access code
+                                            {{else}}
+                                                Enter your 12-character access code
+                                            {{end}}
                                         </label>
                                         <span id="description-hint" class="label__description  input--with-description">
                                             Keep this code safe. You will need to enter it every time you access your survey
@@ -53,7 +57,7 @@
                                                class="input input--text input-type__input uac__input js-uac u-mb-xs"
                                                name="uac"
                                                data-group-size="4"
-                                               maxlength="14"
+                                               maxlength={{if .uac16}}"19"{{else}}"14"{{end}}
                                                autocomplete="off"
                                                autofocus
                                                autocapitalize="characters"
