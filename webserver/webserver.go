@@ -102,6 +102,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	authController := &AuthController{
 		Auth:       auth,
 		CSRFSecret: server.Config.SessionSecret,
+		UacKind:    server.Config.UacKind,
 	}
 
 	securityController := &SecurityController{}
