@@ -16,7 +16,7 @@ import (
 const (
 	JWT_TOKEN_KEY            = "jwt_token"
 	NO_ACCESS_CODE_ERR       = "Enter an access code"
-	INVALID_LENGTH_ERR       = "Enter a 12-character access code"
+	INVALID_LENGTH_ERR       = "Enter a %d-character access code"
 	INVALID_UAC16_LENGTH_ERR = "Enter a 16-character access code"
 	NOT_RECOGNISED_ERR       = "Access code not recognised. Enter the code again"
 	INTERNAL_SERVER_ERR      = "We were unable to process your request, please try again"
@@ -78,6 +78,7 @@ func (auth *Auth) HasSession(context *gin.Context) (bool, *UACClaims) {
 }
 
 func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
+	var uacLength = 12
 	uac := context.PostForm("uac")
 	uac = strings.ReplaceAll(uac, " ", "")
 
@@ -86,20 +87,12 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	switch auth.UacKind {
-	case "uac":
-		if len(uac) != 12 {
-			auth.NotAuthWithError(context, INVALID_LENGTH_ERR)
-			return
-		}
-	case "uac16":
-		if len(uac) != 16 {
-			auth.NotAuthWithError(context, INVALID_UAC16_LENGTH_ERR)
-			return
-		}
-	default:
-		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
-		return
+	if auth.isUac16() {
+		uacLength = 16
+	}
+
+	if len(uac) != uacLength {
+		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, uacLength))
 	}
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
@@ -151,7 +144,7 @@ func (auth *Auth) notAuth(context *gin.Context) {
 func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.Set("csrfSecret", auth.CSRFSecret)
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
-		"error": errorMessage,
+		"error":      errorMessage,
 		"uac16":      auth.isUac16(),
 		"csrf_token": csrf.GetToken(context)})
 	context.Abort()
