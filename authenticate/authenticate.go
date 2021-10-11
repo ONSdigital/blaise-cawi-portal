@@ -142,14 +142,23 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 
 func (auth *Auth) notAuth(context *gin.Context) {
 	context.Set("csrfSecret", auth.CSRFSecret)
-	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{"csrf_token": csrf.GetToken(context)})
+	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
+		"uac16":      auth.isUac16(),
+		"csrf_token": csrf.GetToken(context)})
 	context.Abort()
 }
 
 func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.Set("csrfSecret", auth.CSRFSecret)
-	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{"error": errorMessage, "csrf_token": csrf.GetToken(context)})
+	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
+		"error": errorMessage,
+		"uac16":      auth.isUac16(),
+		"csrf_token": csrf.GetToken(context)})
 	context.Abort()
+}
+
+func (auth *Auth) isUac16() bool {
+	return auth.UacKind == "uac16"
 }
 
 func Forbidden(context *gin.Context) {
