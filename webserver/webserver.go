@@ -57,11 +57,12 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	securityConfig := secure.DefaultConfig()
 	securityConfig.ContentSecurityPolicy = contentSecurityPolicy
-	httpRouter.Use(secure.New(securityConfig))
 
 	if server.Config.DevMode {
 		securityConfig.IsDevelopment = true
 	}
+
+	httpRouter.Use(secure.New(securityConfig))
 
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
 	store.Options(sessions.Options{
