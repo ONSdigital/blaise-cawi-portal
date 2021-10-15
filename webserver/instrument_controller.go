@@ -14,11 +14,13 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type InstrumentController struct {
 	Auth       authenticate.AuthInterface
 	JWTCrypto  authenticate.JWTCryptoInterface
+	Logger     *zap.Logger
 	CatiUrl    string
 	HttpClient *http.Client
 }
@@ -46,11 +48,14 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
 	uacClaim, err := instrumentController.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
+		instrumentController.Logger.Error("Error decrypting JWT", zap.Error(err))
 		instrumentController.Auth.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
 		return nil, err
 	}
 	instrumentName := context.Param("instrumentName")
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
+		instrumentController.Logger.Info("Not authenticated for instrument",
+			append(uacClaim.LogFields(), zap.String("InstrumentName", instrumentName))...)
 		authenticate.Forbidden(context)
 		return nil, fmt.Errorf("Forbidden")
 	}
@@ -67,17 +72,25 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		blaise.CasePayload(uacClaim.UacInfo.CaseID).Form(),
 	)
 	if err != nil {
-		InternalServerError(context)
-		return
-	}
-
-	if resp.StatusCode != http.StatusOK {
+		instrumentController.Logger.Error("Error launching blaise survey", append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context)
 		return
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		instrumentController.Logger.Error("Error launching blaise survey, cannot read response body",
+			append(uacClaim.LogFields(), zap.Error(err))...)
+		InternalServerError(context)
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		instrumentController.Logger.Error("Error launching blaise survey, invalid status code",
+			append(uacClaim.LogFields(),
+				zap.Int("RespStatusCode", resp.StatusCode),
+				zap.ByteString("RespBody", body),
+			)...)
 		InternalServerError(context)
 		return
 	}
