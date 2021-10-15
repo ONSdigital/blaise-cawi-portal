@@ -86,7 +86,8 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	uac = strings.ReplaceAll(uac, " ", "")
 
 	if uac == "" {
-		auth.Logger.Info("Failed auth, blank UAC", utils.GetRequestSource(context)...)
+		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
+			zap.String("Reason", "Blank UAC"))...)
 		auth.NotAuthWithError(context, NO_ACCESS_CODE_ERR)
 		return
 	}
@@ -96,29 +97,34 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 
 	if len(uac) != uacLength {
+		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
+			zap.String("Reason", "Invalid UAC length"), zap.Int("UACLength", uacLength))...)
 		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, uacLength))
 		return
 	}
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
 	if err != nil || uacInfo.InstrumentName == "" || uacInfo.CaseID == "" {
-		log.Println(err)
-		log.Printf("Instrument: %s\n", uacInfo.InstrumentName)
-		log.Printf("Case: %s\n", uacInfo.CaseID)
+		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
+			zap.String("Reason", "Access code not recognised"),
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseID", uacInfo.CaseID),
+			zap.Error(err),
+		)...)
 		auth.NotAuthWithError(context, NOT_RECOGNISED_ERR)
 		return
 	}
 
 	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo)
 	if err != nil {
-		log.Println(err)
+		auth.Logger.Info("Failed to Encrypt JWT", zap.Error(err))
 		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}
 
 	session.Set(JWT_TOKEN_KEY, signedToken)
 	if err := session.Save(); err != nil {
-		log.Println(err)
+		auth.Logger.Info("Failed to save JWT to session", zap.Error(err))
 		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}

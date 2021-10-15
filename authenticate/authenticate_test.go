@@ -59,6 +59,47 @@ var _ = Describe("Login", func() {
 		})
 	})
 
+	Context("Login with a correct length, invalid UAC Code", func() {
+		var uacValue string
+
+		JustBeforeEach(func() {
+			httpRecorder = httptest.NewRecorder()
+			data := url.Values{
+				"uac": []string{uacValue},
+			}
+			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.RemoteAddr = "1.1.1.1"
+			httpRouter.ServeHTTP(httpRecorder, req)
+		})
+
+		BeforeEach(func() {
+			uacValue = validUAC
+			auth.UacKind = "uac"
+			mockBusApi := &mocks.BusApiInterface{}
+			auth.BusApi = mockBusApi
+
+			mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "", CaseID: "bar"}, nil)
+		})
+
+		It("returns a status unauthorised with an error", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+			Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
+			body := httpRecorder.Body.Bytes()
+			Expect(strings.Contains(string(body), `Access code not recognised. Enter the code again`)).To(BeTrue())
+
+			Expect(observedLogs.Len()).To(Equal(1))
+			Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+			Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+			Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Access code not recognised"))
+			Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal(""))
+			Expect(observedLogs.All()[0].ContextMap()["CaseID"]).To(Equal("bar"))
+			Expect(observedLogs.All()[0].ContextMap()["error"]).To(BeNil())
+			Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
+		})
+	})
+
 	Context("Login with a valid UAC Code", func() {
 		var uacValue string
 
@@ -220,6 +261,7 @@ var _ = Describe("Login", func() {
 			}
 			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.RemoteAddr = "1.1.1.1"
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
@@ -234,6 +276,13 @@ var _ = Describe("Login", func() {
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Invalid UAC length"))
+				Expect(observedLogs.All()[0].ContextMap()["UACLength"]).To(Equal(int64(12)))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 
@@ -248,6 +297,13 @@ var _ = Describe("Login", func() {
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `Enter a 16-character access code`)).To(BeTrue())
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Invalid UAC length"))
+				Expect(observedLogs.All()[0].ContextMap()["UACLength"]).To(Equal(int64(16)))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 	})
@@ -270,15 +326,17 @@ var _ = Describe("Login", func() {
 			})
 
 			It("returns a status unauthorised with an error", func() {
-				Expect(observedLogs.Len()).To(Equal(1))
-				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth, blank UAC"))
-				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
-				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `Enter an access code`)).To(BeTrue())
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Blank UAC"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 
@@ -288,15 +346,17 @@ var _ = Describe("Login", func() {
 			})
 
 			It("returns a status unauthorised with an error", func() {
-				Expect(observedLogs.Len()).To(Equal(1))
-				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth, blank UAC"))
-				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
-				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `Enter an access code`)).To(BeTrue())
+				Expect(observedLogs.Len()).To(Equal(1))
+
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Blank UAC"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 	})
