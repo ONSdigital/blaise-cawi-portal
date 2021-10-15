@@ -15,6 +15,9 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -22,8 +25,8 @@ import (
 
 var _ = Describe("Login", func() {
 	var (
-		shortUAC   = "22222"
-		longUAC    = "11112222333344445555"
+		shortUAC    = "22222"
+		longUAC     = "11112222333344445555"
 		spacedUAC   = "1234 5678 9012"
 		spacedUAC16 = "bcdf 5678 ghjk 2345"
 		validUAC    = "123456789012"
@@ -31,15 +34,21 @@ var _ = Describe("Login", func() {
 		jwtCrypto   = &authenticate.JWTCrypto{
 			JWTSecret: "hello",
 		}
-		auth = &authenticate.Auth{
-			JWTCrypto: jwtCrypto,
-		}
-		httpRouter   *gin.Engine
-		httpRecorder *httptest.ResponseRecorder
-		session      sessions.Session
+		auth            *authenticate.Auth
+		httpRouter      *gin.Engine
+		httpRecorder    *httptest.ResponseRecorder
+		session         sessions.Session
+		observedLogs    *observer.ObservedLogs
+		observedZapCore zapcore.Core
 	)
 
 	BeforeEach(func() {
+		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
+		observedLogger := zap.New(observedZapCore)
+		auth = &authenticate.Auth{
+			JWTCrypto: jwtCrypto,
+			Logger:    observedLogger,
+		}
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
@@ -120,7 +129,7 @@ var _ = Describe("Login", func() {
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		Context("Login with a 12 digit UAC kind", func(){
+		Context("Login with a 12 digit UAC kind", func() {
 			BeforeEach(func() {
 				uacValue = spacedUAC
 				auth.UacKind = "uac"
@@ -141,7 +150,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func(){
+		Context("Login with a 16 digit UAC kind", func() {
 			BeforeEach(func() {
 				uacValue = spacedUAC16
 				auth.UacKind = "uac16"
@@ -174,7 +183,7 @@ var _ = Describe("Login", func() {
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		Context("Login with a 12 digit UAC kind", func(){
+		Context("Login with a 12 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac"
 			})
@@ -188,7 +197,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func(){
+		Context("Login with a 16 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -214,7 +223,7 @@ var _ = Describe("Login", func() {
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		Context("Login with a 12 digit UAC kind", func(){
+		Context("Login with a 12 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac"
 			})
@@ -228,7 +237,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func(){
+		Context("Login with a 16 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -251,15 +260,20 @@ var _ = Describe("Login", func() {
 			}
 			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.RemoteAddr = "1.1.1.1"
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		Context("Login with a 12 digit UAC kind", func(){
+		Context("Login with a 12 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac"
 			})
 
 			It("returns a status unauthorised with an error", func() {
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth, blank UAC"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
@@ -268,12 +282,16 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func(){
+		Context("Login with a 16 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
 
 			It("returns a status unauthorised with an error", func() {
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth, blank UAC"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
