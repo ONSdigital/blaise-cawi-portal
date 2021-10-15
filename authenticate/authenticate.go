@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	csrf "github.com/utrack/gin-csrf"
+	"go.uber.org/zap"
 )
 
 const (
@@ -40,6 +42,7 @@ type AuthInterface interface {
 type Auth struct {
 	BusApi     busapi.BusApiInterface
 	JWTCrypto  JWTCryptoInterface
+	Logger     *zap.Logger
 	CSRFSecret string
 	UacKind    string
 }
@@ -83,6 +86,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	uac = strings.ReplaceAll(uac, " ", "")
 
 	if uac == "" {
+		auth.Logger.Info("Failed auth, blank UAC", utils.GetRequestSource(context)...)
 		auth.NotAuthWithError(context, NO_ACCESS_CODE_ERR)
 		return
 	}
@@ -93,6 +97,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 
 	if len(uac) != uacLength {
 		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, uacLength))
+		return
 	}
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
