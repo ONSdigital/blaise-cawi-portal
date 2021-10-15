@@ -130,12 +130,13 @@ var _ = Describe("Auth Controller", func() {
 			})
 
 			It("gives an auth error", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
+
 				Expect(observedLogs.Len()).To(Equal(1))
 				Expect(observedLogs.All()[0].Message).To(Equal("CSRF mismatch"))
 				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
 				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
-				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
 			})
 		})
 
