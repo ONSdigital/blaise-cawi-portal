@@ -117,14 +117,14 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 
 	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo)
 	if err != nil {
-		auth.Logger.Info("Failed to Encrypt JWT", zap.Error(err))
+		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
 		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}
 
 	session.Set(JWT_TOKEN_KEY, signedToken)
 	if err := session.Save(); err != nil {
-		auth.Logger.Info("Failed to save JWT to session", zap.Error(err))
+		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
 		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
 		return
 	}

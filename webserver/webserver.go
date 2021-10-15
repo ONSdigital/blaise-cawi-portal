@@ -128,6 +128,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	instrumentController := &InstrumentController{
 		Auth:       auth,
 		JWTCrypto:  jwtCrypto,
+		Logger:     logger,
 		CatiUrl:    server.Config.CatiUrl,
 		HttpClient: httpClient,
 	}
