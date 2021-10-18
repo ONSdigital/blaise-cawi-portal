@@ -23,6 +23,7 @@ type InstrumentController struct {
 	Logger     *zap.Logger
 	CatiUrl    string
 	HttpClient *http.Client
+	Debug      bool
 }
 
 func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engine) {
@@ -120,19 +121,23 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	startInterviewTee := io.TeeReader(context.Request.Body, &buffer)
 	startInterviewBody, err := ioutil.ReadAll(startInterviewTee)
 	if err != nil {
-		fmt.Println(err)
+		instrumentController.Logger.Error("Error reading start interview request body",
+			append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context)
 		return true
 	}
 
 	err = json.Unmarshal(startInterviewBody, &startInterview)
 	if err != nil {
-		fmt.Println(err)
+		instrumentController.Logger.Error("Error JSON decoding start interview request",
+			append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context)
 		return true
 	}
 
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
+		instrumentController.Logger.Info("Not authenticated to start interview for case",
+			append(uacClaim.LogFields(), zap.String("CaseID", startInterview.RuntimeParameters.KeyValue))...)
 		authenticate.Forbidden(context)
 		return true
 	}
@@ -149,8 +154,9 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
-	// Only enable this when debugging
-	// proxy.Transport = debugTransport{}
+	if instrumentController.Debug {
+		proxy.Transport = &debugTransport{Logger: instrumentController.Logger}
+	}
 
 	proxy.ServeHTTP(context.Writer, context.Request)
 }
@@ -165,13 +171,15 @@ func isStartInterviewUrl(path, resource string) bool {
 	return fmt.Sprintf("/%s%s", path, resource) == "/api/application/start_interview"
 }
 
-type debugTransport struct{}
+type debugTransport struct {
+	Logger *zap.Logger
+}
 
-func (debugTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+func (debugTransport *debugTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	b, err := httputil.DumpRequestOut(r, false)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(string(b))
+	debugTransport.Logger.Debug("Proxy round trip debug", zap.ByteString("RequestDump", b))
 	return http.DefaultTransport.RoundTrip(r)
 }

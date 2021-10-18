@@ -333,6 +333,13 @@ var _ = Describe("Open Case", func() {
 					Expect(httpRecorder.Body.String()).To(ContainSubstring(
 						`To access this page you need to <a href="/">re-enter your access code</a>`,
 					))
+
+					Expect(observedLogs.Len()).To(Equal(1))
+					Expect(observedLogs.All()[0].Message).To(Equal("Not authenticated to start interview for case"))
+					Expect(observedLogs.All()[0].ContextMap()["AuthedCaseID"]).To(Equal(caseID))
+					Expect(observedLogs.All()[0].ContextMap()["AuthedInstrumentName"]).To(Equal(instrumentName))
+					Expect(observedLogs.All()[0].ContextMap()["CaseID"]).To(Equal(requestedCaseID))
+					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 				})
 			})
 		})
