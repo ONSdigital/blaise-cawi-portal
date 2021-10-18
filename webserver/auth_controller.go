@@ -13,6 +13,7 @@ import (
 type AuthController struct {
 	Auth       authenticate.AuthInterface
 	CSRFSecret string
+	UacKind    string
 }
 
 func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
@@ -20,7 +21,9 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 	authGroup.Use(csrf.Middleware(csrf.Options{
 		Secret: authController.CSRFSecret,
 		ErrorFunc: func(context *gin.Context) {
-			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{"error": "Something went wrong, please try again"})
+			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
+				"uac16": authController.isUac16(),
+				"error": "Something went wrong, please try again"})
 			context.Abort()
 		},
 	}))
@@ -38,7 +41,11 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 		context.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/%s/", claim.UacInfo.InstrumentName))
 		return
 	}
-	context.HTML(http.StatusOK, "login.tmpl", gin.H{"csrf_token": csrf.GetToken(context)})
+
+	context.HTML(http.StatusOK, "login.tmpl", gin.H{
+		"uac16":      authController.isUac16(),
+		"csrf_token": csrf.GetToken(context),
+	})
 }
 
 func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
@@ -51,4 +58,8 @@ func (authController *AuthController) LogoutEndpoint(context *gin.Context) {
 	session := sessions.Default(context)
 
 	authController.Auth.Logout(context, session)
+}
+
+func (authController *AuthController) isUac16() bool {
+	return authController.UacKind == "uac16"
 }

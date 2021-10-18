@@ -15,7 +15,7 @@ vpc_access_connector:
   name: projects/_PROJECT_ID/locations/europe-west2/connectors/vpcconnect
 
 automatic_scaling:
-  max_instances: 50
+  max_instances: 25
   min_instances: 1
   max_concurrent_requests: 40
 
