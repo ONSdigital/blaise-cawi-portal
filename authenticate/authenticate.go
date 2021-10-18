@@ -14,12 +14,13 @@ import (
 )
 
 const (
-	JWT_TOKEN_KEY           = "jwt_token"
-	NO_ACCESS_CODE_ERR      = "Enter an access code"
-	INVALID_LENGTH_ERR      = "Enter a 12-character access code"
-	NOT_RECOGNISED_ERR      = "Access code not recognised. Enter the code again"
-	INTERNAL_SERVER_ERR     = "We were unable to process your request, please try again"
-	ISSUER                  = "social-surveys-web-portal"
+	JWT_TOKEN_KEY            = "jwt_token"
+	NO_ACCESS_CODE_ERR       = "Enter an access code"
+	INVALID_LENGTH_ERR       = "Enter a %d-character access code"
+	INVALID_UAC16_LENGTH_ERR = "Enter a 16-character access code"
+	NOT_RECOGNISED_ERR       = "Access code not recognised. Enter the code again"
+	INTERNAL_SERVER_ERR      = "We were unable to process your request, please try again"
+	ISSUER                   = "social-surveys-web-portal"
 )
 
 var expirationTime = "2h"
@@ -37,9 +38,10 @@ type AuthInterface interface {
 }
 
 type Auth struct {
-	BusApi        busapi.BusApiInterface
-	JWTCrypto     JWTCryptoInterface
-	CSRFSecret    string
+	BusApi     busapi.BusApiInterface
+	JWTCrypto  JWTCryptoInterface
+	CSRFSecret string
+	UacKind    string
 }
 
 func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
@@ -76,6 +78,7 @@ func (auth *Auth) HasSession(context *gin.Context) (bool, *UACClaims) {
 }
 
 func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
+	var uacLength = 12
 	uac := context.PostForm("uac")
 	uac = strings.ReplaceAll(uac, " ", "")
 
@@ -83,9 +86,13 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		auth.NotAuthWithError(context, NO_ACCESS_CODE_ERR)
 		return
 	}
-	if len(uac) <= 11 || len(uac) >= 13 {
-		auth.NotAuthWithError(context, INVALID_LENGTH_ERR)
-		return
+
+	if auth.isUac16() {
+		uacLength = 16
+	}
+
+	if len(uac) != uacLength {
+		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, uacLength))
 	}
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
@@ -128,14 +135,23 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 
 func (auth *Auth) notAuth(context *gin.Context) {
 	context.Set("csrfSecret", auth.CSRFSecret)
-	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{"csrf_token": csrf.GetToken(context)})
+	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
+		"uac16":      auth.isUac16(),
+		"csrf_token": csrf.GetToken(context)})
 	context.Abort()
 }
 
 func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.Set("csrfSecret", auth.CSRFSecret)
-	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{"error": errorMessage, "csrf_token": csrf.GetToken(context)})
+	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
+		"error":      errorMessage,
+		"uac16":      auth.isUac16(),
+		"csrf_token": csrf.GetToken(context)})
 	context.Abort()
+}
+
+func (auth *Auth) isUac16() bool {
+	return auth.UacKind == "uac16"
 }
 
 func Forbidden(context *gin.Context) {

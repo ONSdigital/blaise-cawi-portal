@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -23,7 +25,10 @@ var _ = Describe("Auth Controller", func() {
 	var (
 		httpRouter     *gin.Engine
 		mockAuth       = &mocks.AuthInterface{}
-		authController = &webserver.AuthController{Auth: mockAuth, CSRFSecret: "fwibble"}
+		authController = &webserver.AuthController{
+			Auth:       mockAuth,
+			CSRFSecret: "fwibble",
+			UacKind:    "uac"}
 		instrumentName = "foobar"
 		caseID         = "fizzbuzz"
 	)
@@ -145,6 +150,39 @@ var _ = Describe("Auth Controller", func() {
 			It("calls it auth.login", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 				mockAuth.AssertNumberOfCalls(GinkgoT(), "Login", 1)
+			})
+		})
+
+		Context("with an invalid UAC Code", func() {
+			JustBeforeEach(func() {
+				httpRecorder = httptest.NewRecorder()
+				data := url.Values{
+					"uac": []string{"123"},
+				}
+				req, _ := http.NewRequest("POST", "/auth/login", strings.NewReader(data.Encode()))
+				httpRouter.ServeHTTP(httpRecorder, req)
+			})
+
+				Context("Login with a 12 character UAC kind", func() {
+				BeforeEach(func() {
+					authController.UacKind = "uac"
+				})
+
+					It("states a 12-character access code is required", func() {
+						Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+						Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 12-character access code`))
+					})
+			})
+
+				Context("Login with a 16 character UAC kind", func() {
+					BeforeEach(func() {
+						authController.UacKind = "uac16"
+					})
+
+					It("states a 16-character access code is required", func() {
+						Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+						Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 16-character access code`))
+					})
 			})
 		})
 	})
