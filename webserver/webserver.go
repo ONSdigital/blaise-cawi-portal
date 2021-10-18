@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/api/idtoken"
 )
 
@@ -49,8 +50,24 @@ func LoadConfig() (*Config, error) {
 	return &config, nil
 }
 
-func NewLogger() (*zap.Logger, error) {
-	logger, err := zap.NewProduction()
+func NewLogger(config *Config) (*zap.Logger, error) {
+	var (
+		logger *zap.Logger
+		err    error
+	)
+	if config.DevMode {
+		logger, err = zap.NewDevelopment()
+	} else {
+		var zapOptions []zap.Option
+		if config.Debug {
+			zapOptions = append(zapOptions,
+				zap.IncreaseLevel(zap.LevelEnablerFunc(func(level zapcore.Level) bool {
+					return true
+				})),
+			)
+		}
+		logger, err = zap.NewProduction(zapOptions...)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +80,7 @@ type Server struct {
 }
 
 func (server *Server) SetupRouter() *gin.Engine {
-	logger, err := NewLogger()
+	logger, err := NewLogger(server.Config)
 	if err != nil {
 		log.Fatalf("Error setting up logger: %s", err)
 	}
