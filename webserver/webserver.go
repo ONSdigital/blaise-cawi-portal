@@ -38,6 +38,7 @@ type Config struct {
 	Port             string `default:"8080"`
 	UacKind          string `default:"uac" split_words:"true"`
 	DevMode          bool   `default:"false" split_words:"true"`
+	Debug            bool   `default:"false"`
 }
 
 func LoadConfig() (*Config, error) {
