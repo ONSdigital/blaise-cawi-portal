@@ -124,6 +124,7 @@ var _ = Describe("Open Case", func() {
 		Context("Invalid responses from opening a case in Blaise", func() {
 			JustBeforeEach(func() {
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
+				mockAuth.On("NotAuthWithError", mock.Anything, mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(nil, errors.New("No JWT"))
 
 				httpRecorder = CreateTestResponseRecorder()
@@ -132,8 +133,7 @@ var _ = Describe("Open Case", func() {
 			})
 
 			It("Returns a 401 response with an internal server error", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(authenticate.INTERNAL_SERVER_ERR))
+				mockAuth.AssertNumberOfCalls(GinkgoT(), "NotAuthWithError", 1)
 			})
 		})
 
