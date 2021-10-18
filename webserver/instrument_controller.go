@@ -148,6 +148,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 func (instrumentController *InstrumentController) proxy(context *gin.Context, uacClaim *authenticate.UACClaims) {
 	remote, err := url.Parse(instrumentController.CatiUrl)
 	if err != nil {
+		instrumentController.Logger.Error("Could not parse url for proxying", zap.String("URL", instrumentController.CatiUrl))
 		InternalServerError(context)
 		return
 	}
