@@ -10,7 +10,7 @@ type SecurityController struct{}
 
 func (securityController *SecurityController) AddRoutes(httpRouter *gin.Engine) {
 	httpRouter.Use(func(context *gin.Context) {
-		if context.Request.Method == http.MethodTrace || context.Request.Method == "TRACK" {
+		if context.Request.Method == http.MethodTrace {
 			context.AbortWithStatus(http.StatusMethodNotAllowed)
 		}
 	})
