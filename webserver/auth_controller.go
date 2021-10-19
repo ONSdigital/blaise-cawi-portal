@@ -5,13 +5,16 @@ import (
 	"net/http"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
+	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	csrf "github.com/utrack/gin-csrf"
+	"go.uber.org/zap"
 )
 
 type AuthController struct {
 	Auth       authenticate.AuthInterface
+	Logger     *zap.Logger
 	CSRFSecret string
 	UacKind    string
 }
@@ -21,6 +24,7 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 	authGroup.Use(csrf.Middleware(csrf.Options{
 		Secret: authController.CSRFSecret,
 		ErrorFunc: func(context *gin.Context) {
+			authController.Logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
 			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
 				"uac16": authController.isUac16(),
 				"error": "Something went wrong, please try again"})
