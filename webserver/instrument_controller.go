@@ -14,13 +14,16 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type InstrumentController struct {
 	Auth       authenticate.AuthInterface
 	JWTCrypto  authenticate.JWTCryptoInterface
+	Logger     *zap.Logger
 	CatiUrl    string
 	HttpClient *http.Client
+	Debug      bool
 }
 
 func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engine) {
@@ -46,11 +49,14 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
 	uacClaim, err := instrumentController.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
+		instrumentController.Logger.Error("Error decrypting JWT", zap.Error(err))
 		instrumentController.Auth.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
 		return nil, err
 	}
 	instrumentName := context.Param("instrumentName")
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
+		instrumentController.Logger.Info("Not authenticated for instrument",
+			append(uacClaim.LogFields(), zap.String("InstrumentName", instrumentName))...)
 		authenticate.Forbidden(context)
 		return nil, fmt.Errorf("Forbidden")
 	}
@@ -67,17 +73,25 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		blaise.CasePayload(uacClaim.UacInfo.CaseID).Form(),
 	)
 	if err != nil {
-		InternalServerError(context)
-		return
-	}
-
-	if resp.StatusCode != http.StatusOK {
+		instrumentController.Logger.Error("Error launching blaise survey", append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context)
 		return
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		instrumentController.Logger.Error("Error launching blaise survey, cannot read response body",
+			append(uacClaim.LogFields(), zap.Error(err))...)
+		InternalServerError(context)
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		instrumentController.Logger.Error("Error launching blaise survey, invalid status code",
+			append(uacClaim.LogFields(),
+				zap.Int("RespStatusCode", resp.StatusCode),
+				zap.ByteString("RespBody", body),
+			)...)
 		InternalServerError(context)
 		return
 	}
@@ -107,19 +121,23 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	startInterviewTee := io.TeeReader(context.Request.Body, &buffer)
 	startInterviewBody, err := ioutil.ReadAll(startInterviewTee)
 	if err != nil {
-		fmt.Println(err)
+		instrumentController.Logger.Error("Error reading start interview request body",
+			append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context)
 		return true
 	}
 
 	err = json.Unmarshal(startInterviewBody, &startInterview)
 	if err != nil {
-		fmt.Println(err)
+		instrumentController.Logger.Error("Error JSON decoding start interview request",
+			append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context)
 		return true
 	}
 
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
+		instrumentController.Logger.Info("Not authenticated to start interview for case",
+			append(uacClaim.LogFields(), zap.String("CaseID", startInterview.RuntimeParameters.KeyValue))...)
 		authenticate.Forbidden(context)
 		return true
 	}
@@ -130,14 +148,16 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 func (instrumentController *InstrumentController) proxy(context *gin.Context, uacClaim *authenticate.UACClaims) {
 	remote, err := url.Parse(instrumentController.CatiUrl)
 	if err != nil {
+		instrumentController.Logger.Error("Could not parse url for proxying", zap.String("URL", instrumentController.CatiUrl))
 		InternalServerError(context)
 		return
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
-	// Only enable this when debugging
-	// proxy.Transport = debugTransport{}
+	if instrumentController.Debug {
+		proxy.Transport = &debugTransport{Logger: instrumentController.Logger}
+	}
 
 	proxy.ServeHTTP(context.Writer, context.Request)
 }
@@ -152,13 +172,15 @@ func isStartInterviewUrl(path, resource string) bool {
 	return fmt.Sprintf("/%s%s", path, resource) == "/api/application/start_interview"
 }
 
-type debugTransport struct{}
+type debugTransport struct {
+	Logger *zap.Logger
+}
 
-func (debugTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+func (debugTransport *debugTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	b, err := httputil.DumpRequestOut(r, false)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(string(b))
+	debugTransport.Logger.Debug("Proxy round trip debug", zap.ByteString("RequestDump", b))
 	return http.DefaultTransport.RoundTrip(r)
 }

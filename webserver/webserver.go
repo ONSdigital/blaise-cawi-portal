@@ -3,8 +3,8 @@ package webserver
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
-	"os"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
@@ -13,6 +13,8 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/api/idtoken"
 )
 
@@ -37,6 +39,7 @@ type Config struct {
 	Port             string `default:"8080"`
 	UacKind          string `default:"uac" split_words:"true"`
 	DevMode          bool   `default:"false" split_words:"true"`
+	Debug            bool   `default:"false"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -47,11 +50,40 @@ func LoadConfig() (*Config, error) {
 	return &config, nil
 }
 
+func NewLogger(config *Config) (*zap.Logger, error) {
+	var (
+		logger *zap.Logger
+		err    error
+	)
+	if config.DevMode {
+		logger, err = zap.NewDevelopment()
+	} else {
+		var zapOptions []zap.Option
+		if config.Debug {
+			zapOptions = append(zapOptions,
+				zap.IncreaseLevel(zap.LevelEnablerFunc(func(level zapcore.Level) bool {
+					return true
+				})),
+			)
+		}
+		logger, err = zap.NewProduction(zapOptions...)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer logger.Sync()
+	return logger, nil
+}
+
 type Server struct {
 	Config *Config
 }
 
 func (server *Server) SetupRouter() *gin.Engine {
+	logger, err := NewLogger(server.Config)
+	if err != nil {
+		log.Fatalf("Error setting up logger: %s", err)
+	}
 	httpRouter := gin.Default()
 	httpClient := &http.Client{}
 
@@ -81,8 +113,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientId)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		logger.Fatal("Error creating bus client", zap.Error(err))
 	}
 
 	jwtCrypto := &authenticate.JWTCrypto{
@@ -91,6 +122,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	auth := &authenticate.Auth{
 		JWTCrypto: jwtCrypto,
+		Logger:    logger,
 		BusApi: &busapi.BusApi{
 			BaseUrl: server.Config.BusUrl,
 			Client:  client,
@@ -101,6 +133,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	authController := &AuthController{
 		Auth:       auth,
+		Logger:     logger,
 		CSRFSecret: server.Config.SessionSecret,
 		UacKind:    server.Config.UacKind,
 	}
@@ -113,6 +146,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	instrumentController := &InstrumentController{
 		Auth:       auth,
 		JWTCrypto:  jwtCrypto,
+		Logger:     logger,
 		CatiUrl:    server.Config.CatiUrl,
 		HttpClient: httpClient,
 	}

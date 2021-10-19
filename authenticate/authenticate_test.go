@@ -15,6 +15,9 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -22,8 +25,8 @@ import (
 
 var _ = Describe("Login", func() {
 	var (
-		shortUAC   = "22222"
-		longUAC    = "11112222333344445555"
+		shortUAC    = "22222"
+		longUAC     = "11112222333344445555"
 		spacedUAC   = "1234 5678 9012"
 		spacedUAC16 = "bcdf 5678 ghjk 2345"
 		validUAC    = "123456789012"
@@ -31,15 +34,21 @@ var _ = Describe("Login", func() {
 		jwtCrypto   = &authenticate.JWTCrypto{
 			JWTSecret: "hello",
 		}
-		auth = &authenticate.Auth{
-			JWTCrypto: jwtCrypto,
-		}
-		httpRouter   *gin.Engine
-		httpRecorder *httptest.ResponseRecorder
-		session      sessions.Session
+		auth            *authenticate.Auth
+		httpRouter      *gin.Engine
+		httpRecorder    *httptest.ResponseRecorder
+		session         sessions.Session
+		observedLogs    *observer.ObservedLogs
+		observedZapCore zapcore.Core
 	)
 
 	BeforeEach(func() {
+		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
+		observedLogger := zap.New(observedZapCore)
+		auth = &authenticate.Auth{
+			JWTCrypto: jwtCrypto,
+			Logger:    observedLogger,
+		}
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
@@ -47,6 +56,47 @@ var _ = Describe("Login", func() {
 		httpRouter.POST("/login", func(context *gin.Context) {
 			session = sessions.Default(context)
 			auth.Login(context, session)
+		})
+	})
+
+	Context("Login with a correct length, invalid UAC Code", func() {
+		var uacValue string
+
+		JustBeforeEach(func() {
+			httpRecorder = httptest.NewRecorder()
+			data := url.Values{
+				"uac": []string{uacValue},
+			}
+			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.RemoteAddr = "1.1.1.1"
+			httpRouter.ServeHTTP(httpRecorder, req)
+		})
+
+		BeforeEach(func() {
+			uacValue = validUAC
+			auth.UacKind = "uac"
+			mockBusApi := &mocks.BusApiInterface{}
+			auth.BusApi = mockBusApi
+
+			mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "", CaseID: "bar"}, nil)
+		})
+
+		It("returns a status unauthorised with an error", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+			Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
+			Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
+			body := httpRecorder.Body.Bytes()
+			Expect(strings.Contains(string(body), `Access code not recognised. Enter the code again`)).To(BeTrue())
+
+			Expect(observedLogs.Len()).To(Equal(1))
+			Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+			Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+			Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Access code not recognised"))
+			Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal(""))
+			Expect(observedLogs.All()[0].ContextMap()["CaseID"]).To(Equal("bar"))
+			Expect(observedLogs.All()[0].ContextMap()["error"]).To(BeNil())
+			Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 		})
 	})
 
@@ -120,7 +170,7 @@ var _ = Describe("Login", func() {
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		Context("Login with a 12 digit UAC kind", func(){
+		Context("Login with a 12 digit UAC kind", func() {
 			BeforeEach(func() {
 				uacValue = spacedUAC
 				auth.UacKind = "uac"
@@ -141,7 +191,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func(){
+		Context("Login with a 16 digit UAC kind", func() {
 			BeforeEach(func() {
 				uacValue = spacedUAC16
 				auth.UacKind = "uac16"
@@ -174,7 +224,7 @@ var _ = Describe("Login", func() {
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		Context("Login with a 12 digit UAC kind", func(){
+		Context("Login with a 12 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac"
 			})
@@ -188,7 +238,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func(){
+		Context("Login with a 16 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -211,10 +261,11 @@ var _ = Describe("Login", func() {
 			}
 			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.RemoteAddr = "1.1.1.1"
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		Context("Login with a 12 digit UAC kind", func(){
+		Context("Login with a 12 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac"
 			})
@@ -225,10 +276,17 @@ var _ = Describe("Login", func() {
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Invalid UAC length"))
+				Expect(observedLogs.All()[0].ContextMap()["UACLength"]).To(Equal(int64(12)))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func(){
+		Context("Login with a 16 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -239,6 +297,13 @@ var _ = Describe("Login", func() {
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `Enter a 16-character access code`)).To(BeTrue())
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Invalid UAC length"))
+				Expect(observedLogs.All()[0].ContextMap()["UACLength"]).To(Equal(int64(16)))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 	})
@@ -251,10 +316,11 @@ var _ = Describe("Login", func() {
 			}
 			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req.RemoteAddr = "1.1.1.1"
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		Context("Login with a 12 digit UAC kind", func(){
+		Context("Login with a 12 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac"
 			})
@@ -265,10 +331,16 @@ var _ = Describe("Login", func() {
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `Enter an access code`)).To(BeTrue())
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Blank UAC"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func(){
+		Context("Login with a 16 digit UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -279,6 +351,12 @@ var _ = Describe("Login", func() {
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `Enter an access code`)).To(BeTrue())
+				Expect(observedLogs.Len()).To(Equal(1))
+
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Blank UAC"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 	})

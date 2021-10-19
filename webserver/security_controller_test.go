@@ -38,19 +38,4 @@ var _ = Describe("Security Controller", func() {
 		Entry("longer path", "/foo/bar"),
 		Entry("long path", "/foo/bar/baz"),
 	)
-
-	DescribeTable("TRACK",
-		func(path string) {
-
-			httpRecorder := httptest.NewRecorder()
-			req, _ := http.NewRequest("TRACK", path, nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
-
-			Expect(httpRecorder.Code).To(Equal(http.StatusMethodNotAllowed))
-		},
-		Entry("root", "/"),
-		Entry("short path", "/foo"),
-		Entry("longer path", "/foo/bar"),
-		Entry("long path", "/foo/bar/baz"),
-	)
 })
