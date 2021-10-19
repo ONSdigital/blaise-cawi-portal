@@ -15,6 +15,9 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/stretchr/testify/mock"
 	csrf "github.com/utrack/gin-csrf"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo"
@@ -29,8 +32,10 @@ var _ = Describe("Auth Controller", func() {
 			Auth:       mockAuth,
 			CSRFSecret: "fwibble",
 			UacKind:    "uac"}
-		instrumentName = "foobar"
-		caseID         = "fizzbuzz"
+		instrumentName  = "foobar"
+		caseID          = "fizzbuzz"
+		observedLogs    *observer.ObservedLogs
+		observedZapCore zapcore.Core
 	)
 
 	BeforeEach(func() {
@@ -38,6 +43,10 @@ var _ = Describe("Auth Controller", func() {
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
 		httpRouter.LoadHTMLGlob("../templates/*")
+		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
+		observedLogger := zap.New(observedZapCore)
+		observedLogger.Sync()
+		authController.Logger = observedLogger
 		authController.AddRoutes(httpRouter)
 	})
 
@@ -116,12 +125,18 @@ var _ = Describe("Auth Controller", func() {
 			JustBeforeEach(func() {
 				httpRecorder = httptest.NewRecorder()
 				req, _ := http.NewRequest("POST", "/auth/login?_csrf=dalajksdqoosk", nil)
+				req.RemoteAddr = "1.1.1.1"
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
 
 			It("gives an auth error", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
 				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("CSRF mismatch"))
+				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 
@@ -163,26 +178,26 @@ var _ = Describe("Auth Controller", func() {
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
 
-				Context("Login with a 12 character UAC kind", func() {
+			Context("Login with a 12 character UAC kind", func() {
 				BeforeEach(func() {
 					authController.UacKind = "uac"
 				})
 
-					It("states a 12-character access code is required", func() {
-						Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-						Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 12-character access code`))
-					})
+				It("states a 12-character access code is required", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 12-character access code`))
+				})
 			})
 
-				Context("Login with a 16 character UAC kind", func() {
-					BeforeEach(func() {
-						authController.UacKind = "uac16"
-					})
+			Context("Login with a 16 character UAC kind", func() {
+				BeforeEach(func() {
+					authController.UacKind = "uac16"
+				})
 
-					It("states a 16-character access code is required", func() {
-						Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-						Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 16-character access code`))
-					})
+				It("states a 16-character access code is required", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 16-character access code`))
+				})
 			})
 		})
 	})
