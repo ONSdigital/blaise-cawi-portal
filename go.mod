@@ -3,6 +3,7 @@ module github.com/ONSdigital/blaise-cawi-portal
 go 1.15
 
 require (
+	github.com/blendle/zapdriver v1.3.1
 	github.com/gin-contrib/secure v0.0.1
 	github.com/gin-contrib/sessions v0.0.3
 	github.com/gin-gonic/gin v1.7.2
