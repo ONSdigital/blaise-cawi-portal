@@ -19,6 +19,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // A response recorder that supports streams (for efficent proxying)
@@ -54,6 +57,8 @@ var _ = Describe("Open Case", func() {
 		mockJWTCrypto        = &mocks.JWTCryptoInterface{}
 		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}, Auth: mockAuth, JWTCrypto: mockJWTCrypto}
 		requestBody          io.Reader
+		observedLogs         *observer.ObservedLogs
+		observedZapCore      zapcore.Core
 	)
 
 	BeforeEach(func() {
@@ -61,6 +66,10 @@ var _ = Describe("Open Case", func() {
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.Sessions("mysession", store))
+		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
+		observedLogger := zap.New(observedZapCore)
+		observedLogger.Sync()
+		instrumentController.Logger = observedLogger
 		instrumentController.AddRoutes(httpRouter)
 		httpmock.Activate()
 	})
@@ -118,10 +127,17 @@ var _ = Describe("Open Case", func() {
 				Expect(httpRecorder.Body.String()).To(ContainSubstring(
 					`To access this page you need to <a href="/">re-enter your access code</a>`,
 				))
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Not authenticated for instrument"))
+				Expect(observedLogs.All()[0].ContextMap()["AuthedCaseID"]).To(Equal(caseID))
+				Expect(observedLogs.All()[0].ContextMap()["AuthedInstrumentName"]).To(Equal(instrumentName))
+				Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal("fwibble"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 			})
 		})
 
-		Context("Invalid responses from opening a case in Blaise", func() {
+		Context("When failing to decrupt a JWT", func() {
 			JustBeforeEach(func() {
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockAuth.On("NotAuthWithError", mock.Anything, mock.Anything).Return()
@@ -134,6 +150,11 @@ var _ = Describe("Open Case", func() {
 
 			It("Returns a 401 response with an internal server error", func() {
 				mockAuth.AssertNumberOfCalls(GinkgoT(), "NotAuthWithError", 1)
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Error decrypting JWT"))
+				Expect(observedLogs.All()[0].ContextMap()["error"]).To(Equal("No JWT"))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.ErrorLevel))
 			})
 		})
 
@@ -156,6 +177,14 @@ var _ = Describe("Open Case", func() {
 			It("return a 500 error and redirect to the internal server error page", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusInternalServerError))
 				Expect(httpRecorder.Body.String()).To(ContainSubstring("Sorry, there is a problem with the service"))
+
+				Expect(observedLogs.Len()).To(Equal(1))
+				Expect(observedLogs.All()[0].Message).To(Equal("Error launching blaise survey, invalid status code"))
+				Expect(observedLogs.All()[0].ContextMap()["AuthedCaseID"]).To(Equal(caseID))
+				Expect(observedLogs.All()[0].ContextMap()["AuthedInstrumentName"]).To(Equal(instrumentName))
+				Expect(observedLogs.All()[0].ContextMap()["RespStatusCode"]).To(Equal(int64(500)))
+				Expect(observedLogs.All()[0].ContextMap()["RespBody"]).To(Equal(`"Sad face"`))
+				Expect(observedLogs.All()[0].Level).To(Equal(zap.ErrorLevel))
 			})
 		})
 	})
@@ -304,6 +333,13 @@ var _ = Describe("Open Case", func() {
 					Expect(httpRecorder.Body.String()).To(ContainSubstring(
 						`To access this page you need to <a href="/">re-enter your access code</a>`,
 					))
+
+					Expect(observedLogs.Len()).To(Equal(1))
+					Expect(observedLogs.All()[0].Message).To(Equal("Not authenticated to start interview for case"))
+					Expect(observedLogs.All()[0].ContextMap()["AuthedCaseID"]).To(Equal(caseID))
+					Expect(observedLogs.All()[0].ContextMap()["AuthedInstrumentName"]).To(Equal(instrumentName))
+					Expect(observedLogs.All()[0].ContextMap()["CaseID"]).To(Equal(requestedCaseID))
+					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
 				})
 			})
 		})

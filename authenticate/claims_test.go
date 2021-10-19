@@ -42,4 +42,14 @@ var _ = Describe("Claims", func() {
 		Entry("different case", strings.ToUpper(caseID), true),
 		Entry("not matching", "bacon", false),
 	)
+
+	Describe("LogFields", func() {
+		It("Returns the instrument name and case ID as log fields", func() {
+			fields := claim.LogFields()
+			Expect(fields[0].String).To(Equal(instrumentName))
+			Expect(fields[0].Key).To(Equal("AuthedInstrumentName"))
+			Expect(fields[1].String).To(Equal(caseID))
+			Expect(fields[1].Key).To(Equal("AuthedCaseID"))
+		})
+	})
 })
