@@ -8,6 +8,7 @@ import (
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/blendle/zapdriver"
 	"github.com/gin-contrib/secure"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -56,7 +57,8 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 		err    error
 	)
 	if config.DevMode {
-		logger, err = zap.NewDevelopment()
+		// logger, err = zap.NewDevelopment()
+		logger, err = zapdriver.NewProduction()
 	} else {
 		var zapOptions []zap.Option
 		if config.Debug {
@@ -66,7 +68,7 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 				})),
 			)
 		}
-		logger, err = zap.NewProduction(zapOptions...)
+		logger, err = zapdriver.NewProduction(zapOptions...)
 	}
 	if err != nil {
 		return nil, err
