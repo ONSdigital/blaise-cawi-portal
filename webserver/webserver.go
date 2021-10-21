@@ -16,7 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/api/idtoken"
@@ -86,7 +88,11 @@ func NewTracerProvider(config *Config) *sdktrace.TracerProvider {
 	if err != nil {
 		log.Fatal("Could not create google trace exporter")
 	}
-	return sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+
+	return sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewSchemaless(semconv.ServiceNameKey.String(config.GAEService))),
+	)
 }
 
 func NewTracerMiddleware(config *Config, traceProvider *sdktrace.TracerProvider) gin.HandlerFunc {
