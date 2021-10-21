@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	texporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/blendle/zapdriver"
@@ -14,6 +15,8 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/api/idtoken"
@@ -30,17 +33,19 @@ var (
 )
 
 type Config struct {
-	SessionSecret    string `required:"true" split_words:"true"`
-	EncryptionSecret string `required:"true" split_words:"true"`
-	CatiUrl          string `required:"true" split_words:"true"`
-	JWTSecret        string `required:"true" split_words:"true"`
-	BusUrl           string `required:"true" split_words:"true"`
-	BusClientId      string `required:"true" split_words:"true"`
-	Serverpark       string `default:"gusty"`
-	Port             string `default:"8080"`
-	UacKind          string `default:"uac" split_words:"true"`
-	DevMode          bool   `default:"false" split_words:"true"`
-	Debug            bool   `default:"false"`
+	SessionSecret      string `required:"true" split_words:"true"`
+	EncryptionSecret   string `required:"true" split_words:"true"`
+	CatiUrl            string `required:"true" split_words:"true"`
+	JWTSecret          string `required:"true" split_words:"true"`
+	BusUrl             string `required:"true" split_words:"true"`
+	BusClientId        string `required:"true" split_words:"true"`
+	Serverpark         string `default:"gusty"`
+	Port               string `default:"8080"`
+	UacKind            string `default:"uac" split_words:"true"`
+	DevMode            bool   `default:"false" split_words:"true"`
+	Debug              bool   `default:"false"`
+	GoogleCloudProject string `split_words:"true"`
+	GAEService         string `default:"cawi" split_words:"true"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -57,8 +62,7 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 		err    error
 	)
 	if config.DevMode {
-		// logger, err = zap.NewDevelopment()
-		logger, err = zapdriver.NewProduction()
+		logger, err = zap.NewDevelopment()
 	} else {
 		var zapOptions []zap.Option
 		if config.Debug {
@@ -75,6 +79,18 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 	}
 	defer logger.Sync()
 	return logger, nil
+}
+
+func NewTracerProvider(config *Config) *sdktrace.TracerProvider {
+	exporter, err := texporter.New(texporter.WithProjectID(config.GoogleCloudProject))
+	if err != nil {
+		log.Fatal("Could not create google trace exporter")
+	}
+	return sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+}
+
+func NewTracerMiddleware(config *Config, traceProvider *sdktrace.TracerProvider) gin.HandlerFunc {
+	return otelgin.Middleware(config.GAEService, otelgin.WithTracerProvider(traceProvider))
 }
 
 type Server struct {
@@ -96,6 +112,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 		securityConfig.IsDevelopment = true
 	}
 
+	httpRouter.Use(NewTracerMiddleware(server.Config, NewTracerProvider(server.Config)))
 	httpRouter.Use(secure.New(securityConfig))
 
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
