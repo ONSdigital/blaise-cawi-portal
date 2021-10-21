@@ -9,6 +9,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	csrf "github.com/utrack/gin-csrf"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
 )
 
@@ -25,7 +26,7 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 		Secret: authController.CSRFSecret,
 		ErrorFunc: func(context *gin.Context) {
 			authController.Logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
-			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
+			otelgin.HTML(context, http.StatusForbidden, "login.tmpl", gin.H{
 				"uac16": authController.isUac16(),
 				"error": "Something went wrong, please try again"})
 			context.Abort()
@@ -46,7 +47,7 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 		return
 	}
 
-	context.HTML(http.StatusOK, "login.tmpl", gin.H{
+	otelgin.HTML(context, http.StatusOK, "login.tmpl", gin.H{
 		"uac16":      authController.isUac16(),
 		"csrf_token": csrf.GetToken(context),
 	})

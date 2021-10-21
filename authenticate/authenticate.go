@@ -12,6 +12,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	csrf "github.com/utrack/gin-csrf"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
 )
 
@@ -140,13 +141,13 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 		auth.notAuth(context)
 		return
 	}
-	context.HTML(http.StatusOK, "logout.tmpl", gin.H{})
+	otelgin.HTML(context, http.StatusOK, "logout.tmpl", gin.H{})
 	context.Abort()
 }
 
 func (auth *Auth) notAuth(context *gin.Context) {
 	context.Set("csrfSecret", auth.CSRFSecret)
-	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
+	otelgin.HTML(context, http.StatusUnauthorized, "login.tmpl", gin.H{
 		"uac16":      auth.isUac16(),
 		"csrf_token": csrf.GetToken(context)})
 	context.Abort()
@@ -154,7 +155,7 @@ func (auth *Auth) notAuth(context *gin.Context) {
 
 func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.Set("csrfSecret", auth.CSRFSecret)
-	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
+	otelgin.HTML(context, http.StatusUnauthorized, "login.tmpl", gin.H{
 		"error":      errorMessage,
 		"uac16":      auth.isUac16(),
 		"csrf_token": csrf.GetToken(context)})
@@ -166,7 +167,7 @@ func (auth *Auth) isUac16() bool {
 }
 
 func Forbidden(context *gin.Context) {
-	context.HTML(http.StatusForbidden, "access_denied.tmpl", gin.H{})
+	otelgin.HTML(context, http.StatusForbidden, "access_denied.tmpl", gin.H{})
 	context.Abort()
 }
 

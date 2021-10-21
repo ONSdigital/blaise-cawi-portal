@@ -176,7 +176,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.GET("/", authController.LoginEndpoint)
 
 	httpRouter.NoRoute(func(context *gin.Context) {
-		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{})
+		otelgin.HTML(context, http.StatusOK, "not_found.tmpl", gin.H{})
 	})
 
 	return httpRouter
