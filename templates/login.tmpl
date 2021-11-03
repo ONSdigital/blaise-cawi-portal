@@ -52,9 +52,9 @@
                                             Keep this code safe. You will need to enter it every time you access your study
                                         </span>
                                         <input type="hidden" name="_csrf" value="{{.csrf_token}}"/>
-                                        <input type="text"
+                                        <input type={{if .uac16}}"text"{{else}}"number"{{end}}
                                                id="uac"
-                                               class="input input--text input-type__input uac__input js-uac u-mb-xs"
+                                               class="input input--text input-type__input uac__input js-uac u-mb-xs {{if .uac16}}input--w-15 {{else}}input--w-10 {{end}}"
                                                name="uac"
                                                data-group-size="4"
                                                maxlength={{if .uac16}}"19"{{else}}"14"{{end}}
@@ -62,7 +62,7 @@
                                                autofocus
                                                autocapitalize="characters"
                                                aria-describedby="description-hint"/>
-                                        <a class="u-fs-s" href="#">
+                                        <a class="u-fs-s" href="https://google.com">
                                             Where to find your access code
                                         </a>
                                     </div>
