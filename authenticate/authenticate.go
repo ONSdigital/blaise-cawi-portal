@@ -18,8 +18,8 @@ import (
 const (
 	JWT_TOKEN_KEY            = "jwt_token"
 	NO_ACCESS_CODE_ERR       = "Enter an access code"
-	INVALID_LENGTH_ERR       = "Enter a %d-character access code"
-	INVALID_UAC16_LENGTH_ERR = "Enter a 16-character access code"
+	INVALID_LENGTH_ERR       = "Enter a %d-digit access code"
+	INVALID_UAC16_LENGTH_ERR = "Enter a 16-digit access code"
 	NOT_RECOGNISED_ERR       = "Access code not recognised. Enter the code again"
 	INTERNAL_SERVER_ERR      = "We were unable to process your request, please try again"
 	ISSUER                   = "social-surveys-web-portal"
