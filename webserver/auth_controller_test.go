@@ -73,7 +73,7 @@ var _ = Describe("Auth Controller", func() {
 
 			It("returns a 200 response and the login page", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Access survey`))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Access study`))
 			})
 		})
 
