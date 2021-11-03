@@ -56,7 +56,7 @@
                                                id="uac"
                                                class="input input--text input-type__input uac__input js-uac u-mb-xs {{if .uac16}}input--w-15 {{else}}input--w-10 {{end}}"
                                                name="uac"
-                                               data-group-size="4"
+                                               data-group-size={{if .uac16}}"19"{{else}}"14"{{end}}
                                                maxlength={{if .uac16}}"19"{{else}}"14"{{end}}
                                                autocomplete="off"
                                                autofocus
