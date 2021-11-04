@@ -52,7 +52,7 @@
                                             Keep this code safe. You will need to enter it every time you access your study
                                         </span>
                                         <input type="hidden" name="_csrf" value="{{.csrf_token}}"/>
-                                        <input type={{if .uac16}}"text"{{else}}"number"{{end}}
+                                        <input type="text"
                                                id="uac"
                                                class="input input--text input-type__input uac__input js-uac u-mb-xs {{if .uac16}}input--w-15 {{else}}input--w-10 {{end}}"
                                                name="uac"
