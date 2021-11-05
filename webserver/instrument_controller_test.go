@@ -179,7 +179,7 @@ var _ = Describe("Open Case", func() {
 				Expect(httpRecorder.Body.String()).To(ContainSubstring("Sorry, there is a problem with the service"))
 
 				Expect(observedLogs.Len()).To(Equal(1))
-				Expect(observedLogs.All()[0].Message).To(Equal("Error launching blaise survey, invalid status code"))
+				Expect(observedLogs.All()[0].Message).To(Equal("Error launching blaise study, invalid status code"))
 				Expect(observedLogs.All()[0].ContextMap()["AuthedCaseID"]).To(Equal(caseID))
 				Expect(observedLogs.All()[0].ContextMap()["AuthedInstrumentName"]).To(Equal(instrumentName))
 				Expect(observedLogs.All()[0].ContextMap()["RespStatusCode"]).To(Equal(int64(500)))
