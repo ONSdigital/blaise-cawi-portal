@@ -183,7 +183,7 @@ var _ = Describe("Auth Controller", func() {
 					authController.UacKind = "uac"
 				})
 
-				It("states a 12-digit code is required", func() {
+				It("states a 12-digit access code is required", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
 					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 12-digit access code`))
 				})
