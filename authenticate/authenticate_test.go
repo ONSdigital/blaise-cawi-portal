@@ -238,7 +238,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -248,7 +248,7 @@ var _ = Describe("Login", func() {
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `Enter a 16-digit access code`)).To(BeTrue())
+				Expect(strings.Contains(string(body), `Enter a 16-character access code`)).To(BeTrue())
 			})
 		})
 	})
@@ -296,7 +296,7 @@ var _ = Describe("Login", func() {
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `Enter a 16-digit access code`)).To(BeTrue())
+				Expect(strings.Contains(string(body), `Enter a 16-character access code`)).To(BeTrue())
 
 				Expect(observedLogs.Len()).To(Equal(1))
 				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
