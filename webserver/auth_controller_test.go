@@ -194,9 +194,9 @@ var _ = Describe("Auth Controller", func() {
 					authController.UacKind = "uac16"
 				})
 
-				It("states a 16-digit access code is required", func() {
+				It("states a 16-character access code is required", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 16-digit access code`))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 16-character access code`))
 				})
 			})
 		})
