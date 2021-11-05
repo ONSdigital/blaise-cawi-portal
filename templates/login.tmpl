@@ -99,8 +99,11 @@
                             </div>
                         </div>
                         <div id="collapsible-content" class="collapsible__content js-collapsible-content">
-                            <p>To start your online study, you will need the 12-digit access code printed on the letter we sent you.</p>
+                            <p>To start your online study, you will need your access code printed on the letter we sent you. {{if .uac16}}Your 16-character access code will be a combination of letters and numbers.{{else}} {{end}}</p>
                             <p><img src="/assets/images/letter.png" alt="An example of the study letter showing that the access code is in the centre of the letter"></p>
+                            <div class="panel panel--simple panel--warn js-panel-info u-mb-m u-mt-s">
+                                <span class="panel__icon" aria-hidden="true">!</span><div class="panel__body">Keep this code safe. You will need to enter it every time you access your census.</div>
+                            </div>
                             <button type="button" class="btn js-collapsible-button u-d-no btn--secondary btn--small" aria-hidden="true">
                                 <span class="btn__inner js-collapsible-button-inner">Hide this</span>
                                 <span class="btn__context u-vh">Where to find your access code?</span>
