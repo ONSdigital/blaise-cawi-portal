@@ -134,7 +134,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				uacValue = validUAC16
 				auth.UacKind = "uac16"
@@ -191,7 +191,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				uacValue = spacedUAC16
 				auth.UacKind = "uac16"
@@ -286,7 +286,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -340,7 +340,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})

@@ -189,7 +189,7 @@ var _ = Describe("Auth Controller", func() {
 				})
 			})
 
-			Context("Login with a 16 digit UAC kind", func() {
+			Context("Login with a 16 character UAC kind", func() {
 				BeforeEach(func() {
 					authController.UacKind = "uac16"
 				})
