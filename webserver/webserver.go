@@ -38,7 +38,7 @@ type Config struct {
 	BusClientId      string `required:"true" split_words:"true"`
 	Serverpark       string `default:"gusty"`
 	Port             string `default:"8080"`
-	UacKind          string `default:"uac" split_words:"true"`
+	UacKind          string `default:"uac16" split_words:"true"`
 	DevMode          bool   `default:"false" split_words:"true"`
 	Debug            bool   `default:"false"`
 }
