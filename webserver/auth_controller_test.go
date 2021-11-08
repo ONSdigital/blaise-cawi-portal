@@ -73,7 +73,7 @@ var _ = Describe("Auth Controller", func() {
 
 			It("returns a 200 response and the login page", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Access survey`))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Access study`))
 			})
 		})
 
@@ -178,14 +178,14 @@ var _ = Describe("Auth Controller", func() {
 				httpRouter.ServeHTTP(httpRecorder, req)
 			})
 
-			Context("Login with a 12 character UAC kind", func() {
+			Context("Login with a 12 digit UAC kind", func() {
 				BeforeEach(func() {
 					authController.UacKind = "uac"
 				})
 
-				It("states a 12-character access code is required", func() {
+				It("states a 12-digit access code is required", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 12-character access code`))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 12-digit access code`))
 				})
 			})
 
