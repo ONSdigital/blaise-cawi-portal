@@ -134,7 +134,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				uacValue = validUAC16
 				auth.UacKind = "uac16"
@@ -191,7 +191,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				uacValue = spacedUAC16
 				auth.UacKind = "uac16"
@@ -234,11 +234,11 @@ var _ = Describe("Login", func() {
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
+				Expect(strings.Contains(string(body), `Enter a 12-digit access code`)).To(BeTrue())
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -275,7 +275,7 @@ var _ = Describe("Login", func() {
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `Enter a 12-character access code`)).To(BeTrue())
+				Expect(strings.Contains(string(body), `Enter a 12-digit access code`)).To(BeTrue())
 
 				Expect(observedLogs.Len()).To(Equal(1))
 				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
@@ -286,7 +286,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -340,7 +340,7 @@ var _ = Describe("Login", func() {
 			})
 		})
 
-		Context("Login with a 16 digit UAC kind", func() {
+		Context("Login with a 16 character UAC kind", func() {
 			BeforeEach(func() {
 				auth.UacKind = "uac16"
 			})
@@ -466,7 +466,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 			It("return unauthorized", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
+				Expect(strings.Contains(string(body), `<span class="btn__inner">Access study`)).To(BeTrue())
 			})
 		})
 	})
@@ -482,7 +482,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 		It("return unauthorized", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `<span class="btn__inner">Access survey`)).To(BeTrue())
+			Expect(strings.Contains(string(body), `<span class="btn__inner">Access study`)).To(BeTrue())
 		})
 	})
 })

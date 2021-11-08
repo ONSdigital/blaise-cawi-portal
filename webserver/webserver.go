@@ -112,6 +112,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	//This router has access to all templates in the templates folder
 	httpRouter.AppEngine = true
 	httpRouter.LoadHTMLGlob("templates/*")
+	httpRouter.Static("/assets", "./assets")
 
 	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientId)
 	if err != nil {

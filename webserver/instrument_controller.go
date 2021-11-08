@@ -73,21 +73,21 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		blaise.CasePayload(uacClaim.UacInfo.CaseID).Form(),
 	)
 	if err != nil {
-		instrumentController.Logger.Error("Error launching blaise survey", append(uacClaim.LogFields(), zap.Error(err))...)
+		instrumentController.Logger.Error("Error launching blaise study", append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context)
 		return
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		instrumentController.Logger.Error("Error launching blaise survey, cannot read response body",
+		instrumentController.Logger.Error("Error launching blaise study, cannot read response body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context)
 		return
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		instrumentController.Logger.Error("Error launching blaise survey, invalid status code",
+		instrumentController.Logger.Error("Error launching blaise study, invalid status code",
 			append(uacClaim.LogFields(),
 				zap.Int("RespStatusCode", resp.StatusCode),
 				zap.ByteString("RespBody", body),
