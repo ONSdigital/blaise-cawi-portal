@@ -53,7 +53,7 @@
                                         </span>
                                         <input type="hidden" name="_csrf" value="{{.csrf_token}}"/>
                                         <input type="text"
-                                               id="uac"
+                                               id="uac_input"
                                                class="input input--text input-type__input uac__input js-uac u-mb-xs {{if .uac16}}input--w-15 {{else}}input--w-10 {{end}}"
                                                name="uac"
                                                data-group-size="4"
@@ -61,6 +61,7 @@
                                                autocomplete="off"
                                                autofocus
                                                autocapitalize="characters"
+                                               {{if not .uac16}}pattern="\d*"{{end}}
                                                aria-describedby="description-hint"/>
                                     </div>
                                 </div>
@@ -116,5 +117,36 @@
         {{ template "footer" }}
     </div>
 </div>
+{{ if not .uac16 }}
+{{/* Limit input on uac field if 12 digit uacs */}}
+<script defer>
+    var digitRegExp = new RegExp('\\d');
+    uac_input.addEventListener('keydown', function(event) {
+        /*
+        * Line A: Don't do anything if the Control or Alt keys are pressed down,
+        * as we don't want to prevent the user from using keyboard shortcuts.
+        *
+        * Line B: Make sure we're only handling strings, as those are the only
+        * type of value that we are expecting.
+        *
+        * Line C: We only need to filter out single characters. This is important
+        * because it allows us to continue using keys such as Home, End, and
+        * Enter, all of which are useful for maneuvering the form, and all of which
+        * are longer than 1 character.
+        */
+        if(event.ctrlKey // (A)
+        || event.altKey // (A)
+        || typeof event.key !== 'string' // (B)
+        || event.key.length !== 1) { // (C)
+            return;
+        }
+
+        if(!digitRegExp.test(event.key)) {
+            console.log(1);
+            event.preventDefault();
+        }
+    }, false);
+</script>
+{{ end }}
 </body>
 </html>
