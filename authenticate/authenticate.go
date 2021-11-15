@@ -107,7 +107,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
-	if err != nil || uacInfo.InstrumentName == "" || uacInfo.CaseID == "" {
+	if err != nil || uacInfo.InvalidCase() {
 		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Access code not recognised"),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
