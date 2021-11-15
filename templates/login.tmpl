@@ -136,6 +136,7 @@
         */
         if(event.ctrlKey // (A)
         || event.altKey // (A)
+        || event.metaKey // (A)
         || typeof event.key !== 'string' // (B)
         || event.key.length !== 1) { // (C)
             return;
