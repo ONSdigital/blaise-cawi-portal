@@ -8,19 +8,55 @@
 [![Github contributors](https://img.shields.io/github/contributors/ONSdigital/blaise-cawi-portal.svg)](https://github.com/ONSdigital/blaise-cawi-portal/graphs/contributors)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/ONSdigital/blaise-cawi-portal.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ONSdigital/blaise-cawi-portal/alerts/)
 
-
-Inialising Go
-`go mod init github.com/onsdigital/blaise-cawi-portal`
-
 ![portal](./portal.gif)
 
-TODO:
-- Instrument Controller
-    - Edge case tests
-    - Draw pretty picture for Ken
+## Inialising Go
 
+**Note**: This is a one off task per repo, but is being documented for future reference
 
-    - Can we do anything nicer with timed out sessions?
+```sh
+go mod init github.com/onsdigital/blaise-cawi-portal
+```
 
+## Tests
 
-- everything else will require auth stage 2
+```sh
+go test ./...
+```
+
+## Run locally
+
+### Create service account credentials
+
+```sh
+gcloud iam service-accounts keys create blaise.json --iam-account ons-blaise-v2-<blaise_env>@appspot.gserviceaccount.com
+```
+
+### Run
+
+BUS CLient ID:
+
+```sh
+BLAISE_ENV=<blaise-env>
+export BLAISE_ENV
+gcloud config set project "ons-blaise-v2-${BLAISE_ENV}"
+OAUTH_NAME=$(gcloud alpha iap oauth-brands list --format=json | jq -r '.[] | select(.applicationTitle == "blaise").name')
+BUS_CLIENT_ID=$(gcloud alpha iap oauth-clients list "${OAUTH_NAME}" --format=json | jq -r '.[] | select(.displayName == "bus").name' | awk -F/ '{print $NF}')
+export BUS_CLIENT_ID
+```
+
+```sh
+DEV_MODE=true \
+GOOGLE_APPLICATION_CREDENTIALS=blaise.json \
+BUS_CLIENT_ID=${BUS_CLIENT_ID} \
+BUS_URL="https://${BLAISE_ENV}-bus.social-surveys.gcp.onsdigital.uk" \
+CATI_URL="https://${BLAISE_ENV}-cati.social-surveys.gcp.onsdigital.uk" \
+JWT_SECRET=WFyra7pl8F2M0NuCaPug5pMzzQ073yPU \
+SESSION_SECRET=9796ruc2baWXNXixtiqdOcWTSsxltdbm91W7OSJkVIqOtTDhkzVSJAX12VR28B6O \
+ENCRYPTION_SECRET=9n5cJirZ4s7jr98XUB0O6XXGxjSh6s8a \
+PORT=8080 \
+go run main.go
+```
+
+*Note*: All of the secrets above are randomly generated examples, these are fine to use when running locally but new
+ones should be generated for any deployed environments. This is done at deploy time using terraform.
