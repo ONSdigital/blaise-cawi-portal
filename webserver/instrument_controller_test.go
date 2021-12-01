@@ -72,6 +72,7 @@ var _ = Describe("Open Case", func() {
 		instrumentController.Logger = observedLogger
 		instrumentController.AddRoutes(httpRouter)
 		httpmock.Activate()
+		mockAuth.On("RefreshToken", mock.Anything, mock.Anything, mock.Anything).Return()
 	})
 
 	AfterEach(func() {

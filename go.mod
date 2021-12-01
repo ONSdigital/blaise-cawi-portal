@@ -15,6 +15,7 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/stretchr/testify v1.7.0
 	github.com/utrack/gin-csrf v0.0.0-20190424104817-40fb8d2c8fca
+	github.com/vektra/mockery/v2 v2.9.4 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.19.1
