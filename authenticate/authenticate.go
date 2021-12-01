@@ -24,9 +24,7 @@ const (
 	ISSUER              = "social-surveys-web-portal"
 )
 
-var expirationTime = "2h"
-
-// var expirationTime = "30s"
+var expirationTime = "15m"
 
 //Generate mocks by running "go generate ./..."
 //go:generate mockery --name AuthInterface
@@ -36,6 +34,7 @@ type AuthInterface interface {
 	Logout(*gin.Context, sessions.Session)
 	HasSession(*gin.Context) (bool, *UACClaims)
 	NotAuthWithError(*gin.Context, string)
+	RefreshToken(*gin.Context, sessions.Session, *UACClaims)
 }
 
 type Auth struct {
@@ -176,4 +175,19 @@ func Forbidden(context *gin.Context) {
 func expirationSeconds() int64 {
 	duration, _ := time.ParseDuration(expirationTime)
 	return int64(duration.Seconds())
+}
+
+func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, claim *UACClaims) {
+	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UacInfo)
+	if err != nil {
+		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
+		return
+	}
+
+	session.Set(JWT_TOKEN_KEY, signedToken)
+	if err := session.Save(); err != nil {
+		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
+		return
+	}
+	return
 }
