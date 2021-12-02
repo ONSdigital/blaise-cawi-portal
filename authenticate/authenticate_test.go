@@ -9,6 +9,8 @@ import (
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	mockauth "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
+	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
+	mockrestapi "github.com/ONSdigital/blaise-cawi-portal/blaiserestapi/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi/mocks"
 	"github.com/gin-contrib/sessions"
@@ -34,6 +36,7 @@ var _ = Describe("Login", func() {
 		jwtCrypto   = &authenticate.JWTCrypto{
 			JWTSecret: "hello",
 		}
+		mockRestApi     = &mockrestapi.BlaiseRestApiInterface{}
 		auth            *authenticate.Auth
 		httpRouter      *gin.Engine
 		httpRecorder    *httptest.ResponseRecorder
@@ -45,9 +48,11 @@ var _ = Describe("Login", func() {
 	BeforeEach(func() {
 		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
 		observedLogger := zap.New(observedZapCore)
+		mockRestApi.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
 		auth = &authenticate.Auth{
-			JWTCrypto: jwtCrypto,
-			Logger:    observedLogger,
+			JWTCrypto:     jwtCrypto,
+			BlaiseRestApi: mockRestApi,
+			Logger:        observedLogger,
 		}
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
@@ -551,7 +556,7 @@ var _ = Describe("Has Session", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.Bytes()
 			Expect(string(body)).To(Equal(
-				`{"HasSession":true,"Claim":{"uac":"","instrument_name":"foobar","case_id":"fizzbuzz"}}`,
+				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz"}}`,
 			))
 		})
 	})
