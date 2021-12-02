@@ -9,7 +9,8 @@ import (
 )
 
 type UACClaims struct {
-	UAC string `json:"uac"`
+	UAC         string `json:"uac"`
+	AuthTimeout int    `json:"auth_timeout"`
 	busapi.UacInfo
 	jwt.StandardClaims
 }
@@ -26,5 +27,6 @@ func (uacClaims *UACClaims) LogFields() []zap.Field {
 	var fields []zap.Field
 	fields = append(fields, zap.String("AuthedInstrumentName", uacClaims.UacInfo.InstrumentName))
 	fields = append(fields, zap.String("AuthedCaseID", uacClaims.UacInfo.CaseID))
+	fields = append(fields, zap.Int("AuthTimeout", uacClaims.AuthTimeout))
 	return fields
 }
