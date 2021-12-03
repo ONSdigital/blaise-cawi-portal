@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
+	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
@@ -24,10 +24,6 @@ const (
 	ISSUER              = "social-surveys-web-portal"
 )
 
-var expirationTime = "2h"
-
-// var expirationTime = "30s"
-
 //Generate mocks by running "go generate ./..."
 //go:generate mockery --name AuthInterface
 type AuthInterface interface {
@@ -36,14 +32,16 @@ type AuthInterface interface {
 	Logout(*gin.Context, sessions.Session)
 	HasSession(*gin.Context) (bool, *UACClaims)
 	NotAuthWithError(*gin.Context, string)
+	RefreshToken(*gin.Context, sessions.Session, *UACClaims)
 }
 
 type Auth struct {
-	BusApi     busapi.BusApiInterface
-	JWTCrypto  JWTCryptoInterface
-	Logger     *zap.Logger
-	CSRFSecret string
-	UacKind    string
+	BusApi        busapi.BusApiInterface
+	JWTCrypto     JWTCryptoInterface
+	BlaiseRestApi blaiserestapi.BlaiseRestApiInterface
+	Logger        *zap.Logger
+	CSRFSecret    string
+	UacKind       string
 }
 
 func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
@@ -98,11 +96,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	if len(uac) != uacLength {
 		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Invalid UAC length"), zap.Int("UACLength", uacLength))...)
-		var uacError = "12-digit"
-		if auth.isUac16() {
-			uacError = "16-character"
-		}
-		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, uacError))
+		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, auth.uacError()))
 		return
 	}
 
@@ -118,7 +112,19 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo)
+	instrumentSettings, err := auth.BlaiseRestApi.GetInstrumentSettings(uacInfo.InstrumentName)
+	if err != nil {
+		auth.Logger.Error("Failed auth", append(utils.GetRequestSource(context),
+			zap.String("Reason", "Could not get instrument settings"),
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseID", uacInfo.CaseID),
+			zap.Error(err),
+		)...)
+		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
+		return
+	}
+
+	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo, instrumentSettings.StrictInterviewing().SessionTimeout)
 	if err != nil {
 		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
 		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
@@ -168,12 +174,29 @@ func (auth *Auth) isUac16() bool {
 	return auth.UacKind == "uac16"
 }
 
+func (auth *Auth) uacError() string {
+	if auth.isUac16() {
+		return "16-character"
+	}
+	return "12-digit"
+}
+
 func Forbidden(context *gin.Context) {
 	context.HTML(http.StatusForbidden, "access_denied.tmpl", gin.H{})
 	context.Abort()
 }
 
-func expirationSeconds() int64 {
-	duration, _ := time.ParseDuration(expirationTime)
-	return int64(duration.Seconds())
+func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, claim *UACClaims) {
+	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UacInfo, claim.AuthTimeout)
+	if err != nil {
+		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
+		return
+	}
+
+	session.Set(JWT_TOKEN_KEY, signedToken)
+	if err := session.Save(); err != nil {
+		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
+		return
+	}
+	return
 }
