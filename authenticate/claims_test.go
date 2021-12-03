@@ -12,12 +12,12 @@ import (
 )
 
 var _ = Describe("Claims", func() {
-
 	var (
 		instrumentName = "foo"
 		caseID         = "bar"
 		claim          = &authenticate.UACClaims{
-			UAC: "0008901",
+			UAC:         "0008901",
+			AuthTimeout: 15,
 			UacInfo: busapi.UacInfo{
 				InstrumentName: instrumentName,
 				CaseID:         caseID,
@@ -50,6 +50,8 @@ var _ = Describe("Claims", func() {
 			Expect(fields[0].Key).To(Equal("AuthedInstrumentName"))
 			Expect(fields[1].String).To(Equal(caseID))
 			Expect(fields[1].Key).To(Equal("AuthedCaseID"))
+			Expect(fields[2].Integer).To(Equal(int64(15)))
+			Expect(fields[2].Key).To(Equal("AuthTimeout"))
 		})
 	})
 })

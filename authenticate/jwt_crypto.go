@@ -11,7 +11,7 @@ import (
 //Generate mocks by running "go generate ./..."
 //go:generate mockery --name JWTCryptoInterface
 type JWTCryptoInterface interface {
-	EncryptJWT(string, *busapi.UacInfo) (string, error)
+	EncryptJWT(string, *busapi.UacInfo, int) (string, error)
 	DecryptJWT(interface{}) (*UACClaims, error)
 }
 
@@ -19,15 +19,22 @@ type JWTCrypto struct {
 	JWTSecret string
 }
 
-func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UacInfo) (string, error) {
+var defaultAuthTimeout = 15
+
+func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UacInfo, authTimeout int) (string, error) {
+	if authTimeout == 0 {
+		authTimeout = defaultAuthTimeout
+	}
+
 	claims := UACClaims{
-		UAC: uac,
+		UAC:         uac,
+		AuthTimeout: authTimeout,
 		UacInfo: busapi.UacInfo{
 			InstrumentName: uacInfo.InstrumentName,
 			CaseID:         uacInfo.CaseID,
 		},
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Unix() + expirationSeconds(),
+			ExpiresAt: time.Now().Unix() + expirationSeconds(authTimeout),
 			Issuer:    ISSUER,
 		},
 	}
@@ -51,4 +58,9 @@ func (jwtCrypto *JWTCrypto) DecryptJWT(jwtToken interface{}) (*UACClaims, error)
 	}
 
 	return token.Claims.(*UACClaims), nil
+}
+
+func expirationSeconds(sessionTimeout int) int64 {
+	sessionMinutes := time.Duration(sessionTimeout) * time.Minute
+	return int64(sessionMinutes.Seconds())
 }
