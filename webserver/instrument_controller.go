@@ -60,6 +60,7 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 		authenticate.Forbidden(context)
 		return nil, fmt.Errorf("Forbidden")
 	}
+	instrumentController.Auth.RefreshToken(context, session, uacClaim)
 	return uacClaim, nil
 }
 
