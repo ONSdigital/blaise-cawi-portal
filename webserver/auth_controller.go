@@ -26,8 +26,10 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 		ErrorFunc: func(context *gin.Context) {
 			authController.Logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
 			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
-				"uac16": authController.isUac16(),
-				"error": "Something went wrong, please try again"})
+				"uac16":      authController.isUac16(),
+				"info":       "Request timed out, please try again",
+				"csrf_token": csrf.GetToken(context),
+			})
 			context.Abort()
 		},
 	}))
