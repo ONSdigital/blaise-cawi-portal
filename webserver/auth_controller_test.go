@@ -117,7 +117,7 @@ var _ = Describe("Auth Controller", func() {
 
 			It("gives an auth error", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`Request timed out, please try again`))
 			})
 		})
 
@@ -131,7 +131,7 @@ var _ = Describe("Auth Controller", func() {
 
 			It("gives an auth error", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`Request timed out, please try again`))
 
 				Expect(observedLogs.Len()).To(Equal(1))
 				Expect(observedLogs.All()[0].Message).To(Equal("CSRF mismatch"))
@@ -269,7 +269,7 @@ var _ = Describe("Auth Controller", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.String()
 			Expect(body).To(ContainSubstring(`Sorry, you need to sign in again`))
-			Expect(body).To(ContainSubstring(`This is because you've been inactive inactive for 15 minutes`))
+			Expect(body).To(ContainSubstring(`This is because you've been inactive for 15 minutes`))
 		})
 	})
 })
