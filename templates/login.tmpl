@@ -28,6 +28,17 @@
                         </div>
                         {{ end }}
 
+                        {{ if .info}}
+                        <div aria-labelledby="info-summary-title" role="alert" tabindex="-1" autofocus="autofocus"
+                             class="panel panel--info">
+                            <div class="panel__body">
+                                <h2 id="info-summary-title" data-qa="info-header" class="panel__title u-fs-r--b">
+                                    {{ .info }}
+                                </h2>
+                            </div>
+                        </div>
+                        {{ end }}
+
                         <h1 class="u-mt-l">Start study</h1>
                         <form method="post" action="/auth/login">
                             <div class="panel panel--{{ if .error}}error{{else}}info{{end}} panel--no-title u-mb-s" id="uac">
@@ -61,7 +72,7 @@
                                                autocomplete="off"
                                                autofocus
                                                autocapitalize="characters"
-                                               {{if not .uac16}}pattern="[0-9]{4}\s[0-9]{4}\s[0-9]{4}" inputmode="numeric"{{end}}
+                                               inputmode="numeric"
                                                aria-describedby="description-hint"/>
                                     </div>
                                 </div>

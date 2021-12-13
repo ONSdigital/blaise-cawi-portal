@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+{{ template "head_imports" }}
+</head>
+<body>
+<div class="page">
+    <div class="page__content">
+        <a class="skip__link" href="#main-content">Skip to main content</a>
+        {{ template "header" }}
+        <div class="page__container container " style="min-height: calc(67vh)">
+            <div class="grid">
+                <div class="grid__col col-8@m">
+                    <main id="main-content" class="page__main ">
+                        <h1 class="u-mt-l">Sorry, you need to sign in again</h1>
+                        <p>This is because you've been inactive for {{ .timeout }} minutes and your session has timed out to protect your information.</p>
+                        <p>You need to <a href="/">sign back in</a> to continue your study.
+                    </main>
+                </div>
+            </div>
+        </div>
+        {{ template "footer" }}
+    </div>
+</div>
+</body>
+</html>
