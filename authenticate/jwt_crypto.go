@@ -19,7 +19,7 @@ type JWTCrypto struct {
 	JWTSecret string
 }
 
-var DefaultAuthTimeout = 15
+var DefaultAuthTimeout = 1
 
 func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UacInfo, authTimeout int) (string, error) {
 	if authTimeout == 0 {
