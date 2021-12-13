@@ -103,7 +103,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
 	store.Options(sessions.Options{
 		Path:     "/",
-		MaxAge:   2 * 60 * 60,
+		MaxAge:   60 * 60 * 24 * 30, // 30 days
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
