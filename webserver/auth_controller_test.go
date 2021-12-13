@@ -117,7 +117,7 @@ var _ = Describe("Auth Controller", func() {
 
 			It("gives an auth error", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`Request timed out, please try again`))
 			})
 		})
 
@@ -131,7 +131,7 @@ var _ = Describe("Auth Controller", func() {
 
 			It("gives an auth error", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`<strong>Something went wrong`))
+				Expect(httpRecorder.Body.String()).To(ContainSubstring(`Request timed out, please try again`))
 
 				Expect(observedLogs.Len()).To(Equal(1))
 				Expect(observedLogs.All()[0].Message).To(Equal("CSRF mismatch"))
@@ -219,6 +219,57 @@ var _ = Describe("Auth Controller", func() {
 
 		It("calls it auth.logout", func() {
 			mockAuth.AssertNumberOfCalls(GinkgoT(), "Logout", 1)
+		})
+	})
+
+	Describe("GET /auth/logged-in", func() {
+		var (
+			httpRecorder *httptest.ResponseRecorder
+		)
+
+		JustBeforeEach(func() {
+			httpRecorder = httptest.NewRecorder()
+			req, _ := http.NewRequest("GET", "/auth/logged-in", nil)
+			httpRouter.ServeHTTP(httpRecorder, req)
+		})
+
+		Context("when you have an active session", func() {
+			BeforeEach(func() {
+				mockAuth.On("HasSession", mock.Anything).Return(true, nil)
+			})
+
+			It("returns OK", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			})
+		})
+
+		Context("when you don't have an active session", func() {
+			BeforeEach(func() {
+				mockAuth.On("HasSession", mock.Anything).Return(false, nil)
+			})
+
+			It("returns unauthorised", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+			})
+		})
+	})
+
+	Describe("Get /auth/timed-out", func() {
+		var (
+			httpRecorder *httptest.ResponseRecorder
+		)
+
+		JustBeforeEach(func() {
+			httpRecorder = httptest.NewRecorder()
+			req, _ := http.NewRequest("GET", "/auth/timed-out", nil)
+			httpRouter.ServeHTTP(httpRecorder, req)
+		})
+
+		It("returns the timed out page", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.String()
+			Expect(body).To(ContainSubstring(`Sorry, you need to sign in again`))
+			Expect(body).To(ContainSubstring(`This is because you've been inactive for 15 minutes`))
 		})
 	})
 })
