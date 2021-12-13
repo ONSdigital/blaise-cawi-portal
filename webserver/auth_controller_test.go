@@ -269,7 +269,7 @@ var _ = Describe("Auth Controller", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.String()
 			Expect(body).To(ContainSubstring(`Sorry, you need to sign in again`))
-			Expect(body).To(ContainSubstring(`This is because you've been inactive for 15 minutes`))
+			Expect(body).To(ContainSubstring(`This is because you've been inactive for 1 minutes`))
 		})
 	})
 })
