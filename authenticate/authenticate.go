@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	SESSION_TIMEOUT_KEY = "session_timeout"
 	JWT_TOKEN_KEY       = "jwt_token"
 	NO_ACCESS_CODE_ERR  = "Enter an access code"
 	INVALID_LENGTH_ERR  = "Enter a %s access code"
@@ -124,7 +125,11 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo, instrumentSettings.StrictInterviewing().SessionTimeout)
+	sessionTimeout := instrumentSettings.StrictInterviewing().SessionTimeout
+	if sessionTimeout == 0 {
+		sessionTimeout = DefaultAuthTimeout
+	}
+	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo, sessionTimeout)
 	if err != nil {
 		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
 		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
@@ -132,6 +137,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 
 	session.Set(JWT_TOKEN_KEY, signedToken)
+	session.Set(SESSION_TIMEOUT_KEY, sessionTimeout)
 	if err := session.Save(); err != nil {
 		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
 		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)

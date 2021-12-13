@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -45,6 +47,12 @@ func CreateTestResponseRecorder() *TestResponseRecorder {
 	}
 }
 
+type ErrReader struct{ Error error }
+
+func (e *ErrReader) Read([]byte) (int, error) {
+	return 0, e.Error
+}
+
 var _ = Describe("Open Case", func() {
 	var (
 		catiUrl              = "http://localhost"
@@ -52,7 +60,7 @@ var _ = Describe("Open Case", func() {
 		caseID               = "fizzbuzz"
 		httpRouter           *gin.Engine
 		httpRecorder         *TestResponseRecorder
-		responseInfo         = "hello"
+		responseInfo         = "<html><head></head><body></body></html>"
 		mockAuth             = &mocks.AuthInterface{}
 		mockJWTCrypto        = &mocks.JWTCryptoInterface{}
 		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}, Auth: mockAuth, JWTCrypto: mockJWTCrypto}
@@ -85,32 +93,41 @@ var _ = Describe("Open Case", func() {
 
 	Describe("Open a case in Blaise", func() {
 		Context("Launching Blaise in Cawi mode with a valid instrument and case id", func() {
-			JustBeforeEach(func() {
-				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
-					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+			Context("and the script can be injected", func() {
+				JustBeforeEach(func() {
+					mockResponse := &http.Response{
+						StatusCode: 200,
+						Header: http.Header{
+							"Content-Type": {"text/html"},
+						},
+						Body: ioutil.NopCloser(strings.NewReader(responseInfo)),
+					}
+					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
+						httpmock.ResponderFromResponse(mockResponse))
 
-				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
-				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
-					InstrumentName: instrumentName,
-					CaseID:         caseID,
-				}}, nil)
-				instrumentController.Auth = mockAuth
+					mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
+					mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+						InstrumentName: instrumentName,
+						CaseID:         caseID,
+					}}, nil)
+					instrumentController.Auth = mockAuth
 
-				httpRecorder = CreateTestResponseRecorder()
-				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
+					httpRecorder = CreateTestResponseRecorder()
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
+					httpRouter.ServeHTTP(httpRecorder, req)
+				})
 
-			It("Returns a 200 response and some data", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(responseInfo))
+				It("Returns a 200 response and some data, with an injected check-session script", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+					Expect(httpRecorder.Body.String()).To(Equal(`<html><head></head><body><script src="/assets/js/check-session.js"></script></body></html>`))
+				})
 			})
 		})
 
 		Context("Launching Blaise in Cawi mode for a different instrument", func() {
 			JustBeforeEach(func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
-					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+					httpmock.NewStringResponder(200, responseInfo))
 
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
@@ -194,7 +211,7 @@ var _ = Describe("Open Case", func() {
 		Context("Making a request for a blaise resource gets proxied to the blaise server", func() {
 			JustBeforeEach(func() {
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble/dwibble/qwibble", catiUrl, instrumentName),
-					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+					httpmock.NewStringResponder(200, responseInfo))
 
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
@@ -218,7 +235,7 @@ var _ = Describe("Open Case", func() {
 		Context("Making a request for a blaise resource gets proxied to the blaise server for short urls", func() {
 			JustBeforeEach(func() {
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
-					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+					httpmock.NewStringResponder(200, responseInfo))
 
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
@@ -240,7 +257,7 @@ var _ = Describe("Open Case", func() {
 		Context("When the get is for a different instrument", func() {
 			JustBeforeEach(func() {
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, "notMyInstrument"),
-					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+					httpmock.NewStringResponder(200, responseInfo))
 
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
@@ -266,7 +283,7 @@ var _ = Describe("Open Case", func() {
 		Context("Making a request for a blaise resource posts proxied to the blaise server", func() {
 			JustBeforeEach(func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/fwibble", catiUrl, instrumentName),
-					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+					httpmock.NewStringResponder(200, responseInfo))
 
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
@@ -292,7 +309,7 @@ var _ = Describe("Open Case", func() {
 
 			JustBeforeEach(func() {
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/api/application/start_interview", catiUrl, instrumentName),
-					httpmock.NewJsonResponderOrPanic(200, responseInfo))
+					httpmock.NewStringResponder(200, responseInfo))
 
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
