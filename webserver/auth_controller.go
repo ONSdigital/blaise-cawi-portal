@@ -26,8 +26,10 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 		ErrorFunc: func(context *gin.Context) {
 			authController.Logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
 			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
-				"uac16": authController.isUac16(),
-				"error": "Something went wrong, please try again"})
+				"uac16":      authController.isUac16(),
+				"info":       "Request timed out, please try again",
+				"csrf_token": csrf.GetToken(context),
+			})
 			context.Abort()
 		},
 	}))
@@ -35,6 +37,8 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 		authGroup.GET("/login", authController.LoginEndpoint)
 		authGroup.POST("/login", authController.PostLoginEndpoint)
 		authGroup.GET("/logout", authController.LogoutEndpoint)
+		authGroup.GET("/logged-in", authController.LoggedInEndpoint)
+		authGroup.GET("/timed-out", authController.TimedOutEndpoint)
 	}
 }
 
@@ -62,6 +66,28 @@ func (authController *AuthController) LogoutEndpoint(context *gin.Context) {
 	session := sessions.Default(context)
 
 	authController.Auth.Logout(context, session)
+}
+
+func (authController *AuthController) LoggedInEndpoint(context *gin.Context) {
+	authenticated, _ := authController.Auth.HasSession(context)
+	if !authenticated {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+	context.Status(http.StatusOK)
+}
+
+func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
+	session := sessions.Default(context)
+
+	timeout := session.Get(authenticate.SESSION_TIMEOUT_KEY)
+	if timeout != nil {
+		timeout = timeout.(int)
+	}
+	if timeout == nil || timeout == 0 {
+		timeout = authenticate.DefaultAuthTimeout
+	}
+	context.HTML(http.StatusOK, "timeout.tmpl", gin.H{"timeout": timeout})
 }
 
 func (authController *AuthController) isUac16() bool {

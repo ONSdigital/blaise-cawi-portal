@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"golang.org/x/net/html"
 )
 
 type InstrumentController struct {
@@ -87,6 +89,8 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		return
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		instrumentController.Logger.Error("Error launching blaise study, invalid status code",
 			append(uacClaim.LogFields(),
@@ -97,7 +101,18 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		return
 	}
 
-	defer resp.Body.Close()
+	if getContentType(resp) == "text/html" {
+		var buf bytes.Buffer
+		injectedBody, err := InjectScript(body)
+		if err == nil {
+			html.Render(&buf, injectedBody)
+			body = buf.Bytes()
+		} else {
+			instrumentController.Logger.Error("Error injecting check-session script",
+				append(uacClaim.LogFields(), zap.Error(err))...)
+		}
+	}
+
 	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
 }
 
@@ -184,4 +199,36 @@ func (debugTransport *debugTransport) RoundTrip(r *http.Request) (*http.Response
 	}
 	debugTransport.Logger.Debug("Proxy round trip debug", zap.ByteString("RequestDump", b))
 	return http.DefaultTransport.RoundTrip(r)
+}
+
+func InjectScript(body []byte) (*html.Node, error) {
+	fmt.Println("Inject Script")
+	doc, err := html.Parse(bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	var crawler func(*html.Node)
+	crawler = func(node *html.Node) {
+		if node.Type == html.ElementNode && node.Data == "body" {
+			scriptNode := &html.Node{
+				Type: html.ElementNode,
+				Data: "script",
+				Attr: []html.Attribute{
+					{Key: "src", Val: "/assets/js/check-session.js"},
+				},
+			}
+			node.AppendChild(scriptNode)
+			return
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			crawler(child)
+		}
+	}
+	crawler(doc)
+	return doc, nil
+}
+
+func getContentType(resp *http.Response) string {
+	contentType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	return contentType
 }
