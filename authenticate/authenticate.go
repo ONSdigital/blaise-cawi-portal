@@ -149,14 +149,15 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 }
 
 func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
+	session.Set(JWT_TOKEN_KEY, "")
 	session.Clear()
+	// session.Options(SessionOptions(true))
 	err := session.Save()
 	if err != nil {
 		auth.notAuth(context)
 		return
 	}
 	context.HTML(http.StatusOK, "logout.tmpl", gin.H{})
-	context.Abort()
 }
 
 func (auth *Auth) notAuth(context *gin.Context) {
@@ -176,6 +177,29 @@ func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.Abort()
 }
 
+func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, claim *UACClaims) {
+	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UacInfo, claim.AuthTimeout)
+	if err != nil {
+		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
+		return
+	}
+
+	if session.Get(JWT_TOKEN_KEY) == nil || session.Get(JWT_TOKEN_KEY).(string) == "" {
+		auth.Logger.Info("Not refreshing JWT as it looks like the user has logged out",
+			append(utils.GetRequestSource(context),
+				zap.String("InstrumentName", claim.UacInfo.InstrumentName),
+				zap.String("CaseID", claim.UacInfo.InstrumentName),
+			)...)
+		return
+	}
+	session.Set(JWT_TOKEN_KEY, signedToken)
+	if err := session.Save(); err != nil {
+		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
+		return
+	}
+	return
+}
+
 func (auth *Auth) isUac16() bool {
 	return auth.UacKind == "uac16"
 }
@@ -190,19 +214,4 @@ func (auth *Auth) uacError() string {
 func Forbidden(context *gin.Context) {
 	context.HTML(http.StatusForbidden, "access_denied.tmpl", gin.H{})
 	context.Abort()
-}
-
-func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, claim *UACClaims) {
-	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UacInfo, claim.AuthTimeout)
-	if err != nil {
-		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
-		return
-	}
-
-	session.Set(JWT_TOKEN_KEY, signedToken)
-	if err := session.Save(); err != nil {
-		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
-		return
-	}
-	return
 }
