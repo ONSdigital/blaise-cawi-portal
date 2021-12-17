@@ -12,7 +12,7 @@ import (
 	"github.com/blendle/zapdriver"
 	"github.com/gin-contrib/secure"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
 	"go.uber.org/zap"
@@ -31,6 +31,7 @@ var (
 )
 
 type Config struct {
+	RedisSessionDB   string `default:"localhost:3389" split_words:"true"`
 	SessionSecret    string `required:"true" split_words:"true"`
 	EncryptionSecret string `required:"true" split_words:"true"`
 	CatiUrl          string `required:"true" split_words:"true"`
@@ -100,7 +101,10 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	httpRouter.Use(secure.New(securityConfig))
 
-	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
+	store, err := redis.NewStore(10, "tcp", server.Config.RedisSessionDB, "", []byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
+	if err != nil {
+		log.Fatalf("Could not connect to session database: %s", err)
+	}
 	store.Options(sessions.Options{
 		Path:     "/",
 		MaxAge:   60 * 60 * 24 * 30, // 30 days
