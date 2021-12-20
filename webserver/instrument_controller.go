@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
@@ -181,6 +182,11 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Context) {
 	session := sessions.Default(context)
 
+	// Blaise sometimes executes logout at the exact same millisecond as an executeaction call
+	// This basically means we attempt to clear and refresh our token at the same time, making it
+	// somewhat random if we refresh the users session or actually log them out. A small wait
+	// is the only work around that we have found to be reliable
+	time.Sleep(100 * time.Millisecond)
 	instrumentController.Auth.Logout(context, session)
 }
 
