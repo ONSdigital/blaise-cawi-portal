@@ -151,7 +151,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 	session.Set(JWT_TOKEN_KEY, "")
 	session.Clear()
-	// session.Options(SessionOptions(true))
+	session.Options(sessions.Options{MaxAge: -1})
 	err := session.Save()
 	if err != nil {
 		auth.notAuth(context)
@@ -178,12 +178,6 @@ func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 }
 
 func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, claim *UACClaims) {
-	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UacInfo, claim.AuthTimeout)
-	if err != nil {
-		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
-		return
-	}
-
 	if session.Get(JWT_TOKEN_KEY) == nil || session.Get(JWT_TOKEN_KEY).(string) == "" {
 		auth.Logger.Info("Not refreshing JWT as it looks like the user has logged out",
 			append(utils.GetRequestSource(context),
@@ -192,6 +186,12 @@ func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, c
 			)...)
 		return
 	}
+	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UacInfo, claim.AuthTimeout)
+	if err != nil {
+		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
+		return
+	}
+
 	session.Set(JWT_TOKEN_KEY, signedToken)
 	if err := session.Save(); err != nil {
 		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))

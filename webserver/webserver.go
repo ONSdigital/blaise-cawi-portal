@@ -31,7 +31,7 @@ var (
 )
 
 type Config struct {
-	RedisSessionDB   string `default:"localhost:3389" split_words:"true"`
+	RedisSessionDB   string `default:"localhost:6379" split_words:"true"`
 	SessionSecret    string `required:"true" split_words:"true"`
 	EncryptionSecret string `required:"true" split_words:"true"`
 	CatiUrl          string `required:"true" split_words:"true"`
