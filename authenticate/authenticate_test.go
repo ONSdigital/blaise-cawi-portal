@@ -16,6 +16,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	csrf "github.com/srbry/gin-csrf"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -43,6 +44,10 @@ var _ = Describe("Login", func() {
 		session         sessions.Session
 		observedLogs    *observer.ObservedLogs
 		observedZapCore zapcore.Core
+		csrfManager     = &csrf.DefaultCSRFManager{
+			Secret:      "fwibble",
+			SessionName: "session",
+		}
 	)
 
 	BeforeEach(func() {
@@ -53,13 +58,14 @@ var _ = Describe("Login", func() {
 			JWTCrypto:     jwtCrypto,
 			BlaiseRestApi: mockRestApi,
 			Logger:        observedLogger,
+			CSRFManager:   csrfManager,
 		}
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.Sessions("mysession", store))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
 		httpRouter.POST("/login", func(context *gin.Context) {
-			session = sessions.Default(context)
+			session = sessions.DefaultMany(context, "user_session")
 			auth.Login(context, session)
 		})
 	})
@@ -374,16 +380,20 @@ var _ = Describe("Logout", func() {
 		httpRouter   *gin.Engine
 		httpRecorder *httptest.ResponseRecorder
 		session      sessions.Session
-		auth         = &authenticate.Auth{}
+		csrfManager  = &csrf.DefaultCSRFManager{
+			Secret:      "fwibble",
+			SessionName: "session",
+		}
+		auth = &authenticate.Auth{CSRFManager: csrfManager}
 	)
 
 	BeforeEach(func() {
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.Sessions("mysession", store))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
 		httpRouter.GET("/logout", func(context *gin.Context) {
-			session = sessions.Default(context)
+			session = sessions.DefaultMany(context, "user_session")
 			session.Set("foobar", "fizzbuzz")
 			session.Save()
 			Expect(session.Get("foobar")).ToNot(BeNil())
@@ -412,18 +422,24 @@ var _ = Describe("AuthenticatedWithUac", func() {
 		session sessions.Session
 
 		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
-		auth          = &authenticate.Auth{
-			JWTCrypto: mockJwtCrypto,
+		csrfManager   = &csrf.DefaultCSRFManager{
+			Secret:      "fwibble",
+			SessionName: "session",
+		}
+		auth = &authenticate.Auth{
+			JWTCrypto:   mockJwtCrypto,
+			CSRFManager: csrfManager,
 		}
 		httpRecorder *httptest.ResponseRecorder
 		httpRouter   *gin.Engine
+		sessionValid = false
 	)
 
 	BeforeEach(func() {
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.Sessions("mysession", store))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
 	})
 
 	AfterEach(func() {
@@ -441,9 +457,13 @@ var _ = Describe("AuthenticatedWithUac", func() {
 	Context("when there is a token", func() {
 		BeforeEach(func() {
 			httpRouter.Use(func(context *gin.Context) {
-				session = sessions.Default(context)
+				session = sessions.DefaultMany(context, "user_session")
 				session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
 				session.Save()
+
+				sessionValidation := sessions.DefaultMany(context, "session_validation")
+				sessionValidation.Set(authenticate.SESSION_VALID_KEY, sessionValid)
+				sessionValidation.Save()
 				context.Next()
 			})
 
@@ -458,10 +478,28 @@ var _ = Describe("AuthenticatedWithUac", func() {
 				mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
 			})
 
-			It("Allows the context to continue", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				body := httpRecorder.Body.Bytes()
-				Expect(string(body)).To(Equal("true"))
+			Context("and the session is valid", func() {
+				BeforeEach(func() {
+					sessionValid = true
+				})
+
+				It("Allows the context to continue", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+					body := httpRecorder.Body.Bytes()
+					Expect(string(body)).To(Equal("true"))
+				})
+			})
+
+			Context("and the session is invalid", func() {
+				BeforeEach(func() {
+					sessionValid = false
+				})
+
+				It("returns unauthorized", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
+					body := httpRecorder.Body.Bytes()
+					Expect(strings.Contains(string(body), `<span class="btn__inner">Access study`)).To(BeTrue())
+				})
 			})
 		})
 
@@ -470,7 +508,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 				mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
 			})
 
-			It("return unauthorized", func() {
+			It("returns unauthorized", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				body := httpRecorder.Body.Bytes()
 				Expect(strings.Contains(string(body), `<span class="btn__inner">Access study`)).To(BeTrue())
@@ -486,7 +524,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 			})
 		})
 
-		It("return unauthorized", func() {
+		It("returns unauthorized", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			body := httpRecorder.Body.Bytes()
 			Expect(strings.Contains(string(body), `<span class="btn__inner">Access study`)).To(BeTrue())
@@ -512,10 +550,10 @@ var _ = Describe("Has Session", func() {
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.Sessions("mysession", store))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
 
 		httpRouter.Use(func(context *gin.Context) {
-			session = sessions.Default(context)
+			session = sessions.DefaultMany(context, "user_session")
 			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
 			session.Save()
 			context.Next()
