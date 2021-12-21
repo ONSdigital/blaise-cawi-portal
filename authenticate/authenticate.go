@@ -11,13 +11,14 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	csrf "github.com/utrack/gin-csrf"
+	csrf "github.com/srbry/gin-csrf"
 	"go.uber.org/zap"
 )
 
 const (
 	SESSION_TIMEOUT_KEY = "session_timeout"
 	JWT_TOKEN_KEY       = "jwt_token"
+	SESSION_VALID_KEY   = "session_valid"
 	NO_ACCESS_CODE_ERR  = "Enter an access code"
 	INVALID_LENGTH_ERR  = "Enter a %s access code"
 	NOT_RECOGNISED_ERR  = "Access code not recognised. Enter the code again"
@@ -41,15 +42,15 @@ type Auth struct {
 	JWTCrypto     JWTCryptoInterface
 	BlaiseRestApi blaiserestapi.BlaiseRestApiInterface
 	Logger        *zap.Logger
-	CSRFSecret    string
 	UacKind       string
+	CSRFManager   csrf.CSRFManager
 }
 
 func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
-	session := sessions.Default(context)
+	session := sessions.DefaultMany(context, "user_session")
 	jwtToken := session.Get(JWT_TOKEN_KEY)
 
-	if jwtToken == nil {
+	if jwtToken == nil || !auth.SessionValid(context) {
 		auth.notAuth(context)
 		return
 	}
@@ -64,7 +65,7 @@ func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
 }
 
 func (auth *Auth) HasSession(context *gin.Context) (bool, *UACClaims) {
-	session := sessions.Default(context)
+	session := sessions.DefaultMany(context, "user_session")
 	jwtToken := session.Get(JWT_TOKEN_KEY)
 
 	if jwtToken == nil {
@@ -144,6 +145,14 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
+	validationSession := sessions.DefaultMany(context, "session_validation")
+	validationSession.Set(SESSION_VALID_KEY, true)
+	if err := validationSession.Save(); err != nil {
+		auth.Logger.Error("Failed to save validationSession", zap.Error(err))
+		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
+		return
+	}
+
 	context.Redirect(http.StatusFound, fmt.Sprintf("/%s/", uacInfo.InstrumentName))
 	context.Abort()
 }
@@ -153,7 +162,7 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 	session.Clear()
 	session.Options(sessions.Options{MaxAge: -1})
 	err := session.Save()
-	if err != nil {
+	if err != nil || auth.clearSessionValidation(context) != nil {
 		auth.notAuth(context)
 		return
 	}
@@ -161,24 +170,24 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 }
 
 func (auth *Auth) notAuth(context *gin.Context) {
-	context.Set("csrfSecret", auth.CSRFSecret)
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
 		"uac16":      auth.isUac16(),
-		"csrf_token": csrf.GetToken(context)})
+		"csrf_token": auth.CSRFManager.GetToken(context)})
 	context.Abort()
 }
 
 func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
-	context.Set("csrfSecret", auth.CSRFSecret)
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
 		"error":      errorMessage,
 		"uac16":      auth.isUac16(),
-		"csrf_token": csrf.GetToken(context)})
+		"csrf_token": auth.CSRFManager.GetToken(context)})
 	context.Abort()
 }
 
 func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, claim *UACClaims) {
-	if session.Get(JWT_TOKEN_KEY) == nil || session.Get(JWT_TOKEN_KEY).(string) == "" {
+	jwtToken := session.Get(JWT_TOKEN_KEY)
+	if jwtToken == nil || jwtToken.(string) == "" ||
+		!auth.SessionValid(context) {
 		auth.Logger.Info("Not refreshing JWT as it looks like the user has logged out",
 			append(utils.GetRequestSource(context),
 				zap.String("InstrumentName", claim.UacInfo.InstrumentName),
@@ -186,6 +195,7 @@ func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, c
 			)...)
 		return
 	}
+
 	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UacInfo, claim.AuthTimeout)
 	if err != nil {
 		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
@@ -198,6 +208,23 @@ func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, c
 		return
 	}
 	return
+}
+
+func (auth *Auth) SessionValid(context *gin.Context) bool {
+	validationSession := sessions.DefaultMany(context, "session_validation")
+	sessionValid := validationSession.Get(SESSION_VALID_KEY)
+	if sessionValid == nil {
+		return false
+	}
+	return sessionValid.(bool)
+}
+
+func (auth *Auth) clearSessionValidation(context *gin.Context) error {
+	validationSession := sessions.DefaultMany(context, "session_validation")
+	validationSession.Set(SESSION_VALID_KEY, false)
+	validationSession.Clear()
+	validationSession.Options(sessions.Options{MaxAge: -1})
+	return validationSession.Save()
 }
 
 func (auth *Auth) isUac16() bool {
