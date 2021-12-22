@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
@@ -47,7 +48,7 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 }
 
 func (instrumentController *InstrumentController) instrumentAuth(context *gin.Context) (*authenticate.UACClaims, error) {
-	session := sessions.Default(context)
+	session := sessions.DefaultMany(context, "user_session")
 	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
 	uacClaim, err := instrumentController.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
@@ -62,7 +63,9 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 		authenticate.Forbidden(context)
 		return nil, fmt.Errorf("Forbidden")
 	}
-	instrumentController.Auth.RefreshToken(context, session, uacClaim)
+	if isAPICall(context) {
+		instrumentController.Auth.RefreshToken(context, session, uacClaim)
+	}
 	return uacClaim, nil
 }
 
@@ -179,13 +182,19 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 }
 
 func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Context) {
-	session := sessions.Default(context)
-
+	session := sessions.DefaultMany(context, "user_session")
 	instrumentController.Auth.Logout(context, session)
 }
 
 func isStartInterviewUrl(path, resource string) bool {
 	return fmt.Sprintf("/%s%s", path, resource) == "/api/application/start_interview"
+}
+
+func isAPICall(context *gin.Context) bool {
+	path := context.Param("path")
+	resource := context.Param("resource")
+	return path == "api" || resource == "api" ||
+		strings.Contains(path, "/api/") || strings.Contains(resource, "/api/")
 }
 
 type debugTransport struct {

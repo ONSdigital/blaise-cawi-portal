@@ -13,8 +13,8 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
+	csrf "github.com/srbry/gin-csrf"
 	"github.com/stretchr/testify/mock"
-	csrf "github.com/utrack/gin-csrf"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -26,33 +26,40 @@ import (
 
 var _ = Describe("Auth Controller", func() {
 	var (
-		httpRouter     *gin.Engine
-		mockAuth       = &mocks.AuthInterface{}
+		httpRouter  *gin.Engine
+		mockAuth    = &mocks.AuthInterface{}
+		csrfManager = &csrf.DefaultCSRFManager{
+			Secret:      "fwibble",
+			SessionName: "session",
+		}
 		authController = &webserver.AuthController{
-			Auth:       mockAuth,
-			CSRFSecret: "fwibble",
-			UacKind:    "uac"}
+			Auth:        mockAuth,
+			CSRFManager: csrfManager,
+			UacKind:     "uac",
+		}
 		instrumentName  = "foobar"
 		caseID          = "fizzbuzz"
 		observedLogs    *observer.ObservedLogs
 		observedZapCore zapcore.Core
+		config          = &webserver.Config{UacKind: "uac16"}
 	)
 
 	BeforeEach(func() {
-		httpRouter = gin.Default()
-		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.Sessions("mysession", store))
-		httpRouter.LoadHTMLGlob("../templates/*")
 		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
 		observedLogger := zap.New(observedZapCore)
 		observedLogger.Sync()
+		csrfManager.ErrorFunc = webserver.CSRFErrorFunc(csrfManager, config, observedLogger)
+		httpRouter = gin.Default()
+		store := cookie.NewStore([]byte("secret"))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
+		httpRouter.LoadHTMLGlob("../templates/*")
 		authController.Logger = observedLogger
 		authController.AddRoutes(httpRouter)
 	})
 
 	AfterEach(func() {
 		mockAuth = &mocks.AuthInterface{}
-		authController = &webserver.AuthController{Auth: mockAuth}
+		authController = &webserver.AuthController{Auth: mockAuth, CSRFManager: csrfManager}
 	})
 
 	Describe("GET /auth/login", func() {
@@ -145,8 +152,7 @@ var _ = Describe("Auth Controller", func() {
 
 			JustBeforeEach(func() {
 				httpRouter.GET("/token", func(context *gin.Context) {
-					context.Set("csrfSecret", authController.CSRFSecret)
-					csrfToken = csrf.GetToken(context)
+					csrfToken = csrfManager.GetToken(context)
 				})
 
 				req1, _ := http.NewRequest("GET", "/token", nil)
@@ -169,10 +175,22 @@ var _ = Describe("Auth Controller", func() {
 		})
 
 		Context("with an invalid UAC Code", func() {
+			var csrfToken string
+
 			JustBeforeEach(func() {
+				httpRouter.GET("/token", func(context *gin.Context) {
+					csrfToken = csrfManager.GetToken(context)
+				})
+
+				req1, _ := http.NewRequest("GET", "/token", nil)
+
+				httpRecorder = httptest.NewRecorder()
+				httpRouter.ServeHTTP(httpRecorder, req1)
+
 				httpRecorder = httptest.NewRecorder()
 				data := url.Values{
-					"uac": []string{"123"},
+					"uac":   []string{"123"},
+					"_csrf": []string{csrfToken},
 				}
 				req, _ := http.NewRequest("POST", "/auth/login", strings.NewReader(data.Encode()))
 				httpRouter.ServeHTTP(httpRecorder, req)
@@ -181,6 +199,7 @@ var _ = Describe("Auth Controller", func() {
 			Context("Login with a 12 digit UAC kind", func() {
 				BeforeEach(func() {
 					authController.UacKind = "uac"
+					config.UacKind = "uac"
 				})
 
 				It("states a 12-digit access code is required", func() {
@@ -192,6 +211,7 @@ var _ = Describe("Auth Controller", func() {
 			Context("Login with a 16 character UAC kind", func() {
 				BeforeEach(func() {
 					authController.UacKind = "uac16"
+					config.UacKind = "uac16"
 				})
 
 				It("states a 16-character access code is required", func() {
