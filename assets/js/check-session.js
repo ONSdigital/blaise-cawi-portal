@@ -7,11 +7,15 @@ window.addEventListener('click', function(event) {
     target.parentElement.getAttribute("role") == "button" ||
     target.parentElement.tagName == "button"
   ) {
-    var xmlHttp = new XMLHttpRequest
-    xmlHttp.open("GET", "/auth/logged-in", false);
-    xmlHttp.send(null);
-    if (xmlHttp.status !== 200) {
-      this.window.location.replace("/auth/timed-out");
+    if (
+      target.innerText.toLowerCase() !== "save and sign out"
+    ) {
+      var xmlHttp = new XMLHttpRequest
+      xmlHttp.open("GET", "/auth/logged-in", false);
+      xmlHttp.send(null);
+      if (xmlHttp.status !== 200) {
+        this.window.location.replace("/auth/timed-out");
+      };
     };
-  }
+  };
 }, false);
