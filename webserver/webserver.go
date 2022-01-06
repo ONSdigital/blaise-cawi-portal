@@ -9,12 +9,15 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/blendle/zapdriver"
 	"github.com/gin-contrib/secure"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
+	csrf "github.com/srbry/gin-csrf"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/api/idtoken"
@@ -31,6 +34,7 @@ var (
 )
 
 type Config struct {
+	RedisSessionDB   string `default:"localhost:6379" split_words:"true"`
 	SessionSecret    string `required:"true" split_words:"true"`
 	EncryptionSecret string `required:"true" split_words:"true"`
 	CatiUrl          string `required:"true" split_words:"true"`
@@ -79,6 +83,52 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 	return logger, nil
 }
 
+func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Logger) func(*gin.Context) {
+	return func(context *gin.Context) {
+		logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
+		context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
+			"uac16":      config.UacKind == "uac16",
+			"info":       "Request timed out, please try again",
+			"csrf_token": csrfManager.GetToken(context),
+		})
+		context.Abort()
+	}
+}
+
+func NewCSRFManager(config *Config, logger *zap.Logger) csrf.CSRFManager {
+	csrfManager := &csrf.DefaultCSRFManager{
+		SessionName: "session",
+		Secret:      config.SessionSecret,
+	}
+
+	csrfManager.ErrorFunc = CSRFErrorFunc(csrfManager, config, logger)
+
+	return csrfManager
+}
+
+func UserSessionStore(config *Config) (sessions.Store, error) {
+	var (
+		store sessions.Store
+	)
+	if config.DevMode {
+		store = cookie.NewStore([]byte(config.SessionSecret), []byte(config.EncryptionSecret))
+	} else {
+		var err error
+		store, err = redis.NewStore(10, "tcp", config.RedisSessionDB, "", []byte(config.SessionSecret), []byte(config.EncryptionSecret))
+		if err != nil {
+			return nil, err
+		}
+	}
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   60 * 60 * 24, // 1 days
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+	return store, nil
+}
+
 type Server struct {
 	Config *Config
 }
@@ -100,8 +150,13 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	httpRouter.Use(secure.New(securityConfig))
 
-	store := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
-	store.Options(sessions.Options{
+	store, err := UserSessionStore(server.Config)
+	if err != nil {
+		log.Fatalf("Could not connect to session database: %s", err)
+	}
+
+	cookieStore := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
+	cookieStore.Options(sessions.Options{
 		Path:     "/",
 		MaxAge:   60 * 60 * 24 * 30, // 30 days
 		HttpOnly: true,
@@ -109,10 +164,24 @@ func (server *Server) SetupRouter() *gin.Engine {
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	httpRouter.Use(sessions.Sessions("session", store))
+	sessionStores := []sessions.SessionStore{
+		{
+			Name:  "session",
+			Store: cookieStore,
+		},
+		{
+			Name:  "user_session",
+			Store: store,
+		},
+		{
+			Name:  "session_validation",
+			Store: store,
+		},
+	}
+	httpRouter.Use(sessions.SessionsManyStores(sessionStores))
 
 	//This router has access to all templates in the templates folder
-	httpRouter.AppEngine = true
+	httpRouter.TrustedPlatform = gin.PlatformGoogleAppEngine
 	httpRouter.LoadHTMLGlob("templates/*")
 	httpRouter.Static("/assets", "./assets")
 
@@ -131,6 +200,8 @@ func (server *Server) SetupRouter() *gin.Engine {
 		Client:     &http.Client{},
 	}
 
+	csrfManager := NewCSRFManager(server.Config, logger)
+
 	auth := &authenticate.Auth{
 		JWTCrypto:     jwtCrypto,
 		BlaiseRestApi: blaiseRestApi,
@@ -139,15 +210,15 @@ func (server *Server) SetupRouter() *gin.Engine {
 			BaseUrl: server.Config.BusUrl,
 			Client:  client,
 		},
-		CSRFSecret: server.Config.SessionSecret,
-		UacKind:    server.Config.UacKind,
+		UacKind:     server.Config.UacKind,
+		CSRFManager: csrfManager,
 	}
 
 	authController := &AuthController{
-		Auth:       auth,
-		Logger:     logger,
-		CSRFSecret: server.Config.SessionSecret,
-		UacKind:    server.Config.UacKind,
+		Auth:        auth,
+		Logger:      logger,
+		UacKind:     server.Config.UacKind,
+		CSRFManager: csrfManager,
 	}
 
 	securityController := &SecurityController{}
