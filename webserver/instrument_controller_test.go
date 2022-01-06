@@ -73,7 +73,7 @@ var _ = Describe("Open Case", func() {
 		httpRouter = gin.Default()
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.Sessions("mysession", store))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
 		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
 		observedLogger := zap.New(observedZapCore)
 		observedLogger.Sync()
@@ -375,7 +375,7 @@ var _ = Describe("GET /:instrumentName/logout", func() {
 	BeforeEach(func() {
 		httpRouter = gin.Default()
 		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.Sessions("mysession", store))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
 		httpRouter.LoadHTMLGlob("../templates/*")
 		instrumentController.AddRoutes(httpRouter)
 	})

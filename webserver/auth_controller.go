@@ -5,34 +5,22 @@ import (
 	"net/http"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
-	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	csrf "github.com/utrack/gin-csrf"
+	csrf "github.com/srbry/gin-csrf"
 	"go.uber.org/zap"
 )
 
 type AuthController struct {
-	Auth       authenticate.AuthInterface
-	Logger     *zap.Logger
-	CSRFSecret string
-	UacKind    string
+	Auth        authenticate.AuthInterface
+	Logger      *zap.Logger
+	UacKind     string
+	CSRFManager csrf.CSRFManager
 }
 
 func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 	authGroup := httpRouter.Group("/auth")
-	authGroup.Use(csrf.Middleware(csrf.Options{
-		Secret: authController.CSRFSecret,
-		ErrorFunc: func(context *gin.Context) {
-			authController.Logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
-			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
-				"uac16":      authController.isUac16(),
-				"info":       "Request timed out, please try again",
-				"csrf_token": csrf.GetToken(context),
-			})
-			context.Abort()
-		},
-	}))
+	authGroup.Use(authController.CSRFManager.Middleware())
 	{
 		authGroup.GET("/login", authController.LoginEndpoint)
 		authGroup.POST("/login", authController.PostLoginEndpoint)
@@ -43,7 +31,6 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 }
 
 func (authController *AuthController) LoginEndpoint(context *gin.Context) {
-	context.Set("csrfSecret", authController.CSRFSecret)
 	hasSession, claim := authController.Auth.HasSession(context)
 	if hasSession {
 		context.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/%s/", claim.UacInfo.InstrumentName))
@@ -52,18 +39,18 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 
 	context.HTML(http.StatusOK, "login.tmpl", gin.H{
 		"uac16":      authController.isUac16(),
-		"csrf_token": csrf.GetToken(context),
+		"csrf_token": authController.CSRFManager.GetToken(context),
 	})
 }
 
 func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
-	session := sessions.Default(context)
+	session := sessions.DefaultMany(context, "user_session")
 
 	authController.Auth.Login(context, session)
 }
 
 func (authController *AuthController) LogoutEndpoint(context *gin.Context) {
-	session := sessions.Default(context)
+	session := sessions.DefaultMany(context, "user_session")
 
 	authController.Auth.Logout(context, session)
 }
@@ -78,7 +65,7 @@ func (authController *AuthController) LoggedInEndpoint(context *gin.Context) {
 }
 
 func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
-	session := sessions.Default(context)
+	session := sessions.DefaultMany(context, "user_session")
 
 	timeout := session.Get(authenticate.SESSION_TIMEOUT_KEY)
 	if timeout != nil {
