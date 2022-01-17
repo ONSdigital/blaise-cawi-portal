@@ -25,6 +25,8 @@ type InstrumentSettingsType struct {
 
 type InstrumentSettings []InstrumentSettingsType
 
+var InstrumentNotFoundError = fmt.Errorf("instrument not found")
+
 func (instrumentSettings InstrumentSettings) StrictInterviewing() InstrumentSettingsType {
 	for _, instrumentSettingType := range instrumentSettings {
 		if instrumentSettingType.Type == "StrictInterviewing" {
@@ -53,7 +55,7 @@ func (blaiseRestApi *BlaiseRestApi) GetInstrumentSettings(instrumentName string)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("instrument not found")
+		return nil, InstrumentNotFoundError
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
