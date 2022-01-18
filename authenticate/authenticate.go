@@ -116,6 +116,16 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 
 	instrumentSettings, err := auth.BlaiseRestApi.GetInstrumentSettings(uacInfo.InstrumentName)
 	if err != nil {
+		if err == blaiserestapi.InstrumentNotFoundError {
+			auth.Logger.Error("Failed auth", append(utils.GetRequestSource(context),
+				zap.String("Reason", "Instrument not installed"),
+				zap.String("InstrumentName", uacInfo.InstrumentName),
+				zap.String("CaseID", uacInfo.CaseID),
+				zap.Error(err),
+			)...)
+			auth.InstrumentNotInstalledError(context)
+			return
+		}
 		auth.Logger.Error("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Could not get instrument settings"),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
@@ -181,6 +191,11 @@ func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 		"error":      errorMessage,
 		"uac16":      auth.isUac16(),
 		"csrf_token": auth.CSRFManager.GetToken(context)})
+	context.Abort()
+}
+
+func (auth *Auth) InstrumentNotInstalledError(context *gin.Context) {
+	context.HTML(http.StatusOK, "not_live.tmpl", gin.H{})
 	context.Abort()
 }
 
