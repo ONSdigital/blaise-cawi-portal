@@ -19,8 +19,7 @@ const (
 	SESSION_TIMEOUT_KEY = "session_timeout"
 	JWT_TOKEN_KEY       = "jwt_token"
 	SESSION_VALID_KEY   = "session_valid"
-	NO_ACCESS_CODE_ERR  = "Enter an access code"
-	INVALID_LENGTH_ERR  = "Enter a %s access code"
+	INVALID_LENGTH_ERR  = "Enter your %s access code"
 	NOT_RECOGNISED_ERR  = "Access code not recognised. Enter the code again"
 	INTERNAL_SERVER_ERR = "We were unable to process your request, please try again"
 	ISSUER              = "social-surveys-web-portal"
@@ -87,7 +86,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	if uac == "" {
 		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Blank UAC"))...)
-		auth.NotAuthWithError(context, NO_ACCESS_CODE_ERR)
+		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, auth.uacError()))
 		return
 	}
 
