@@ -14,6 +14,7 @@ import (
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
+	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -21,12 +22,13 @@ import (
 )
 
 type InstrumentController struct {
-	Auth       authenticate.AuthInterface
-	JWTCrypto  authenticate.JWTCryptoInterface
-	Logger     *zap.Logger
-	CatiUrl    string
-	HttpClient *http.Client
-	Debug      bool
+	Auth            authenticate.AuthInterface
+	JWTCrypto       authenticate.JWTCryptoInterface
+	Logger          *zap.Logger
+	CatiUrl         string
+	HttpClient      *http.Client
+	Debug           bool
+	LanguageManager languagemanager.LanguageManagerInterface
 }
 
 func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engine) {
@@ -60,7 +62,7 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
 		instrumentController.Logger.Info("Not authenticated for instrument",
 			append(uacClaim.LogFields(), zap.String("InstrumentName", instrumentName))...)
-		authenticate.Forbidden(context)
+		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return nil, fmt.Errorf("Forbidden")
 	}
 	if isAPICall(context) {
@@ -157,7 +159,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
 		instrumentController.Logger.Info("Not authenticated to start interview for case",
 			append(uacClaim.LogFields(), zap.String("CaseID", startInterview.RuntimeParameters.KeyValue))...)
-		authenticate.Forbidden(context)
+		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
 	context.Request.Body = ioutil.NopCloser(&buffer)

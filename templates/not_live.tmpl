@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{if .welsh}}cy{{else}}en{{end}}">
 <head>
 {{ template "head_imports" }}
 </head>
@@ -9,9 +9,15 @@
     <div class="grid">
         <div class="grid__col col-8@m">
             <main id="page-main-content" class="page__main ">
-                <h1>The study is currently unavailable</h1>
-                <p>Please try again later or contact our Survey Enquiry Line on 0800 085 7376 for help.</p>
-                <p>Any answers you have provided in previous sessions have been logged securely and confidentially. They will only be used for the purposes of this research.</p>
+                {{if .welsh}}
+                    <h1>WELSH The study is currently unavailable</h1>
+                    <p>WELSH Please try again later or contact our Survey Enquiry Line on 0800 085 7376 for help.</p>
+                    <p>WELSH Any answers you have provided in previous sessions have been logged securely and confidentially. They will only be used for the purposes of this research.</p>
+                {{else}}
+                    <h1>The study is currently unavailable</h1>
+                    <p>Please try again later or contact our Survey Enquiry Line on 0800 085 7376 for help.</p>
+                    <p>Any answers you have provided in previous sessions have been logged securely and confidentially. They will only be used for the purposes of this research.</p>
+                {{end}}
         </div>
     </div>
 </div>

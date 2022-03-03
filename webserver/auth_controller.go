@@ -39,11 +39,7 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 		return
 	}
 
-	var welsh = false
-	lang, langPresent := context.GetQuery("lang")
-	if langPresent && lang == "cy" {
-		welsh = true
-	}
+	welsh := isWelshFromParam(context)
 
 	authController.LanguageManager.SetWelsh(context, welsh)
 
@@ -85,9 +81,25 @@ func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
 	if timeout == nil || timeout == 0 {
 		timeout = authenticate.DefaultAuthTimeout
 	}
-	context.HTML(http.StatusOK, "timeout.tmpl", gin.H{"timeout": timeout})
+
+	welsh := isWelshFromParam(context)
+
+	authController.LanguageManager.SetWelsh(context, welsh)
+
+	context.HTML(http.StatusOK, "timeout.tmpl", gin.H{
+		"timeout": timeout,
+		"welsh":   welsh,
+	})
 }
 
 func (authController *AuthController) isUac16() bool {
 	return authController.UacKind == "uac16"
+}
+
+func isWelshFromParam(context *gin.Context) bool {
+	lang, langPresent := context.GetQuery("lang")
+	if langPresent && lang == "cy" {
+		return true
+	}
+	return false
 }
