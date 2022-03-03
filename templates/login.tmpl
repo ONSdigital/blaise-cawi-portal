@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{if .welsh}}cy{{else}}en{{end}}">
 <head>
 {{ template "head_imports" }}
 </head>
@@ -17,7 +17,11 @@
                              class="panel panel--error">
                             <div class="panel__header">
                                 <h2 id="error-summary-title" data-qa="error-header" class="panel__title u-fs-r--b">
+                                    {{ if .welsh }}
+                                    Welsh There is a problem with this page
+                                    {{else}}
                                     There is a problem with this page
+                                    {{end}}
                                 </h2>
                             </div>
                             <div class="panel__body">
@@ -91,7 +95,7 @@
                             </div>
                             <div class="btn-group">
                                 <button type="submit" type="submit" id="submit-btn"  class="btn btn-group__btn btn--loader js-loader js-submit-btn">
-                                    <span class="btn__inner">Access study
+                                    <span class="btn__inner">{{if .welsh}}Astudiaeth mynediad{{else}}Access study{{end}}
                                         {{ template "btn_loading_svg" }}
                                     </span>
                                 </button>

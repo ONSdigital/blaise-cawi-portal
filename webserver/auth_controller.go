@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
+	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	csrf "github.com/srbry/gin-csrf"
@@ -12,10 +13,11 @@ import (
 )
 
 type AuthController struct {
-	Auth        authenticate.AuthInterface
-	Logger      *zap.Logger
-	UacKind     string
-	CSRFManager csrf.CSRFManager
+	Auth            authenticate.AuthInterface
+	Logger          *zap.Logger
+	UacKind         string
+	CSRFManager     csrf.CSRFManager
+	LanguageManager languagemanager.LanguageManagerInterface
 }
 
 func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
@@ -37,9 +39,18 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 		return
 	}
 
+	var welsh = false
+	lang, langPresent := context.GetQuery("lang")
+	if langPresent && lang == "cy" {
+		welsh = true
+	}
+
+	authController.LanguageManager.SetWelsh(context, welsh)
+
 	context.HTML(http.StatusOK, "login.tmpl", gin.H{
 		"uac16":      authController.isUac16(),
 		"csrf_token": authController.CSRFManager.GetToken(context),
+		"welsh":      welsh,
 	})
 }
 
