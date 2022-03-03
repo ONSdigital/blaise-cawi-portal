@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{if .welsh}}cy{{else}}en{{end}}">
 <head>
 {{ template "head_imports" }}
 </head>
@@ -9,10 +9,17 @@
     <div class="grid">
         <div class="grid__col col-8@m">
             <main id="page-main-content" class="page__main ">
-                <h1>Sorry, there is a problem with the service</h1>
-                <p>Try again later.</p>
-                <p>If you have started a study, your answers have been saved.</p>
-                <p><a href="#0">Contact us</a> if you need to speak to someone about your study.</p>
+                {{if .welsh}}
+                    <h1>WELSH Sorry, there is a problem with the service</h1>
+                    <p>WELSH Try again later.</p>
+                    <p>WELSH If you have started a study, your answers have been saved.</p>
+                    <p>WELSH <a href="#0">Contact us</a> if you need to speak to someone about your study.</p>
+                {{else}}
+                    <h1>Sorry, there is a problem with the service</h1>
+                    <p>Try again later.</p>
+                    <p>If you have started a study, your answers have been saved.</p>
+                    <p><a href="#0">Contact us</a> if you need to speak to someone about your study.</p>
+                {{end}}
         </div>
     </div>
 </div>

@@ -89,11 +89,6 @@ func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Log
 		logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
 		var errorMessage string
 		isWelsh := languageManger.IsWelsh(context)
-		fmt.Println("$$$$$$$$$$$$")
-		fmt.Println("$$$$$$$$$$$$")
-		fmt.Println("$$$$$$$$$$$$")
-		fmt.Println("$$$$$$$$$$$$")
-		fmt.Println(isWelsh)
 		if isWelsh {
 			errorMessage = "Cais wedi dod i ben, triwch eto"
 		} else {
@@ -256,11 +251,12 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	authController.AddRoutes(httpRouter)
 	instrumentController := &InstrumentController{
-		Auth:       auth,
-		JWTCrypto:  jwtCrypto,
-		Logger:     logger,
-		CatiUrl:    server.Config.CatiUrl,
-		HttpClient: httpClient,
+		Auth:            auth,
+		JWTCrypto:       jwtCrypto,
+		Logger:          logger,
+		CatiUrl:         server.Config.CatiUrl,
+		HttpClient:      httpClient,
+		LanguageManager: languageManager,
 	}
 	instrumentController.AddRoutes(httpRouter)
 	healthController := &HealthController{}

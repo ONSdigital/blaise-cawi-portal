@@ -63,6 +63,7 @@ var _ = Describe("Auth Controller", func() {
 
 	AfterEach(func() {
 		mockAuth = &mocks.AuthInterface{}
+		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
 		authController = &webserver.AuthController{Auth: mockAuth, CSRFManager: csrfManager, LanguageManager: languageManagerMock}
 	})
 
@@ -84,15 +85,15 @@ var _ = Describe("Auth Controller", func() {
 				mockAuth.On("HasSession", mock.Anything).Return(false, nil)
 			})
 
-			Context("In english", func() {
+			Context("in english", func() {
 				It("returns a 200 response and the login page", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<html lang="en">`))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Access study`))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Access study`))
 				})
 			})
 
-			Context("In welsh", func() {
+			Context("in welsh", func() {
 				BeforeEach(func() {
 					languageQuery = "?lang=cy"
 				})
@@ -104,7 +105,7 @@ var _ = Describe("Auth Controller", func() {
 				It("returns a 200 response and the login page", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<html lang="cy">`))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<span class="btn__inner">Astudiaeth mynediad`))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Astudiaeth mynediad`))
 				})
 			})
 		})
@@ -149,7 +150,7 @@ var _ = Describe("Auth Controller", func() {
 
 			Context("in english", func() {
 				BeforeEach(func() {
-					languageManagerMock.On("IsWelsh", mock.Anything).Once().Return(false)
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 				})
 
 				It("gives an auth error", func() {
@@ -161,7 +162,7 @@ var _ = Describe("Auth Controller", func() {
 
 			Context("in welsh", func() {
 				BeforeEach(func() {
-					languageManagerMock.On("IsWelsh", mock.Anything).Once().Return(true)
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
 				})
 
 				It("gives an auth error", func() {
@@ -196,6 +197,7 @@ var _ = Describe("Auth Controller", func() {
 			var csrfToken string
 
 			JustBeforeEach(func() {
+				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 				httpRouter.GET("/token", func(context *gin.Context) {
 					csrfToken = csrfManager.GetToken(context)
 				})
@@ -223,6 +225,7 @@ var _ = Describe("Auth Controller", func() {
 			var csrfToken string
 
 			JustBeforeEach(func() {
+				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 				httpRouter.GET("/token", func(context *gin.Context) {
 					csrfToken = csrfManager.GetToken(context)
 				})
@@ -321,20 +324,43 @@ var _ = Describe("Auth Controller", func() {
 
 	Describe("Get /auth/timed-out", func() {
 		var (
-			httpRecorder *httptest.ResponseRecorder
+			httpRecorder  *httptest.ResponseRecorder
+			languageQuery string
 		)
 
 		JustBeforeEach(func() {
+			languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
 			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("GET", "/auth/timed-out", nil)
+			req, _ := http.NewRequest("GET", fmt.Sprintf("/auth/timed-out%s", languageQuery), nil)
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
-		It("returns the timed out page", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			body := httpRecorder.Body.String()
-			Expect(body).To(ContainSubstring(`Sorry, you need to sign in again`))
-			Expect(body).To(ContainSubstring(`This is because you've been inactive for 15 minutes`))
+		Context("in english", func() {
+			It("returns the timed out page", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+				body := httpRecorder.Body.String()
+				Expect(body).To(ContainSubstring(`Sorry, you need to sign in again`))
+				Expect(body).To(ContainSubstring(`This is because you've been inactive for 15 minutes and your session has timed out to protect your information.`))
+				Expect(body).To(ContainSubstring(`You need to <a href="/">sign back in</a> to continue your study.`))
+			})
+		})
+
+		Context("in welsh", func() {
+			BeforeEach(func() {
+				languageQuery = "?lang=cy"
+			})
+
+			AfterEach(func() {
+				languageQuery = ""
+			})
+
+			It("returns the timed out page", func() {
+				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+				body := httpRecorder.Body.String()
+				Expect(body).To(ContainSubstring(`WELSH Sorry, you need to sign in again`))
+				Expect(body).To(ContainSubstring(`WELSH This is because you've been inactive for 15 minutes and your session has timed out to protect your information.`))
+				Expect(body).To(ContainSubstring(`WELSH You need to <a href="/">sign back in</a> to continue your study.`))
+			})
 		})
 	})
 })

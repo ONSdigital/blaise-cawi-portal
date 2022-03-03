@@ -538,7 +538,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 				It("returns unauthorized", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `<span class="btn__inner">Access study`)).To(BeTrue())
+					Expect(string(body)).To(ContainSubstring(`Access study`))
 				})
 			})
 		})
@@ -551,7 +551,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 			It("returns unauthorized", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `<span class="btn__inner">Access study`)).To(BeTrue())
+				Expect(string(body)).To(ContainSubstring(`Access study`))
 			})
 		})
 	})
@@ -567,7 +567,7 @@ var _ = Describe("AuthenticatedWithUac", func() {
 		It("returns unauthorized", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
 			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `<span class="btn__inner">Access study`)).To(BeTrue())
+			Expect(string(body)).To(ContainSubstring(`Access study`))
 		})
 	})
 })

@@ -252,7 +252,7 @@ func (auth *Auth) uacError() string {
 	return "12-digit"
 }
 
-func Forbidden(context *gin.Context) {
-	context.HTML(http.StatusForbidden, "access_denied.tmpl", gin.H{})
+func Forbidden(context *gin.Context, welsh bool) {
+	context.HTML(http.StatusForbidden, "access_denied.tmpl", gin.H{"welsh": welsh})
 	context.Abort()
 }
