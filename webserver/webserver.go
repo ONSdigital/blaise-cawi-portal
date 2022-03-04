@@ -3,6 +3,7 @@ package webserver
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 
@@ -138,6 +139,12 @@ func UserSessionStore(config *Config) (sessions.Store, error) {
 	return store, nil
 }
 
+func WrapWelsh(welsh bool) gin.H {
+	return gin.H{
+		"welsh": welsh,
+	}
+}
+
 type Server struct {
 	Config *Config
 }
@@ -204,6 +211,9 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	//This router has access to all templates in the templates folder
 	httpRouter.TrustedPlatform = gin.PlatformGoogleAppEngine
+	httpRouter.SetFuncMap(template.FuncMap{
+		"WrapWelsh": WrapWelsh,
+	})
 	httpRouter.LoadHTMLGlob("templates/*")
 	httpRouter.Static("/assets", "./assets")
 
@@ -233,8 +243,9 @@ func (server *Server) SetupRouter() *gin.Engine {
 			BaseUrl: server.Config.BusUrl,
 			Client:  client,
 		},
-		UacKind:     server.Config.UacKind,
-		CSRFManager: csrfManager,
+		UacKind:         server.Config.UacKind,
+		CSRFManager:     csrfManager,
+		LanguageManager: languageManager,
 	}
 
 	authController := &AuthController{
@@ -265,7 +276,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.GET("/", authController.LoginEndpoint)
 
 	httpRouter.NoRoute(func(context *gin.Context) {
-		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{})
+		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{"welsh": languageManager.IsWelsh(context)})
 	})
 
 	return httpRouter
