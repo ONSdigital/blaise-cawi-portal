@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"html/template"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -74,9 +74,9 @@ var _ = Describe("Open Case", func() {
 
 	BeforeEach(func() {
 		httpRouter = gin.Default()
-        httpRouter.SetFuncMap(template.FuncMap{
-            "WrapWelsh": webserver.WrapWelsh,
-        })
+		httpRouter.SetFuncMap(template.FuncMap{
+			"WrapWelsh": webserver.WrapWelsh,
+		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
@@ -103,6 +103,8 @@ var _ = Describe("Open Case", func() {
 		Context("Launching Blaise in Cawi mode with a valid instrument and case id", func() {
 			Context("and the script can be injected", func() {
 				JustBeforeEach(func() {
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+
 					mockResponse := &http.Response{
 						StatusCode: 200,
 						Header: http.Header{
@@ -428,9 +430,9 @@ var _ = Describe("GET /:instrumentName/logout", func() {
 		httpRouter = gin.Default()
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
-        httpRouter.SetFuncMap(template.FuncMap{
-            "WrapWelsh": webserver.WrapWelsh,
-        })
+		httpRouter.SetFuncMap(template.FuncMap{
+			"WrapWelsh": webserver.WrapWelsh,
+		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		instrumentController.AddRoutes(httpRouter)
 	})

@@ -78,7 +78,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 	}
 	resp, err := http.PostForm(
 		fmt.Sprintf("%s/%s/default.aspx", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName),
-		blaise.CasePayload(uacClaim.UacInfo.CaseID).Form(),
+		blaise.CasePayload(uacClaim.UacInfo.CaseID, instrumentController.LanguageManager.IsWelsh(context)).Form(),
 	)
 	if err != nil {
 		instrumentController.Logger.Error("Error launching blaise study", append(uacClaim.LogFields(), zap.Error(err))...)

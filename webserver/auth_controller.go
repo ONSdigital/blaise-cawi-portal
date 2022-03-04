@@ -39,14 +39,19 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 		return
 	}
 
-	welsh := isWelshFromParam(context)
-
-	authController.LanguageManager.SetWelsh(context, welsh)
+	requestedLang := languagemanager.GetLangFromParam(context)
+	currentlyWelsh := authController.LanguageManager.IsWelsh(context)
+	if requestedLang == "en" && currentlyWelsh {
+		authController.LanguageManager.SetWelsh(context, false)
+	}
+	if requestedLang == "cy" && !currentlyWelsh {
+		authController.LanguageManager.SetWelsh(context, true)
+	}
 
 	context.HTML(http.StatusOK, "login.tmpl", gin.H{
 		"uac16":      authController.isUac16(),
 		"csrf_token": authController.CSRFManager.GetToken(context),
-		"welsh":      welsh,
+		"welsh":      authController.LanguageManager.IsWelsh(context),
 	})
 }
 
@@ -82,24 +87,12 @@ func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
 		timeout = authenticate.DefaultAuthTimeout
 	}
 
-	welsh := isWelshFromParam(context)
-
-	authController.LanguageManager.SetWelsh(context, welsh)
-
 	context.HTML(http.StatusOK, "timeout.tmpl", gin.H{
 		"timeout": timeout,
-		"welsh":   welsh,
+		"welsh":   authController.LanguageManager.IsWelsh(context),
 	})
 }
 
 func (authController *AuthController) isUac16() bool {
 	return authController.UacKind == "uac16"
-}
-
-func isWelshFromParam(context *gin.Context) bool {
-	lang, langPresent := context.GetQuery("lang")
-	if langPresent && lang == "cy" {
-		return true
-	}
-	return false
 }

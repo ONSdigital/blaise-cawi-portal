@@ -2,11 +2,11 @@ package webserver_test
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"html/template"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -57,9 +57,9 @@ var _ = Describe("Auth Controller", func() {
 		httpRouter = gin.Default()
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
-        httpRouter.SetFuncMap(template.FuncMap{
-            "WrapWelsh": webserver.WrapWelsh,
-        })
+		httpRouter.SetFuncMap(template.FuncMap{
+			"WrapWelsh": webserver.WrapWelsh,
+		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		authController.Logger = observedLogger
 		authController.AddRoutes(httpRouter)
@@ -90,6 +90,9 @@ var _ = Describe("Auth Controller", func() {
 			})
 
 			Context("in english", func() {
+				BeforeEach(func() {
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+				})
 				It("returns a 200 response and the login page", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<html lang="en">`))
@@ -99,6 +102,7 @@ var _ = Describe("Auth Controller", func() {
 
 			Context("in welsh", func() {
 				BeforeEach(func() {
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
 					languageQuery = "?lang=cy"
 				})
 
@@ -280,6 +284,7 @@ var _ = Describe("Auth Controller", func() {
 		)
 
 		BeforeEach(func() {
+			languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 			mockAuth.On("Logout", mock.Anything, mock.Anything).Return()
 		})
 
@@ -328,18 +333,21 @@ var _ = Describe("Auth Controller", func() {
 
 	Describe("Get /auth/timed-out", func() {
 		var (
-			httpRecorder  *httptest.ResponseRecorder
-			languageQuery string
+			httpRecorder *httptest.ResponseRecorder
 		)
 
 		JustBeforeEach(func() {
 			languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
 			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("GET", fmt.Sprintf("/auth/timed-out%s", languageQuery), nil)
+			req, _ := http.NewRequest("GET", "/auth/timed-out", nil)
 			httpRouter.ServeHTTP(httpRecorder, req)
 		})
 
 		Context("in english", func() {
+			BeforeEach(func() {
+				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+			})
+
 			It("returns the timed out page", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 				body := httpRecorder.Body.String()
@@ -351,11 +359,7 @@ var _ = Describe("Auth Controller", func() {
 
 		Context("in welsh", func() {
 			BeforeEach(func() {
-				languageQuery = "?lang=cy"
-			})
-
-			AfterEach(func() {
-				languageQuery = ""
+				languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
 			})
 
 			It("returns the timed out page", func() {
