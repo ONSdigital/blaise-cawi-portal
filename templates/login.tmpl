@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="{{if .welsh}}cy{{else}}en{{end}}">
 <head>
-{{ template "head_imports" }}
+{{ template "head_imports" (WrapWelsh .welsh)}}
 </head>
 <body>
 <div class="page">
@@ -12,7 +12,7 @@
             {{else}}
                 Skip to main content
             {{end}}</a>
-        {{ template "header" }}
+        {{ template "header" (WrapWelsh .welsh)}}
         <div class="page__container container " style="min-height: calc(67vh)">
             <div class="grid">
                 <div class="grid__col col-8@m">
@@ -48,7 +48,7 @@
                         </div>
                         {{ end }}
 
-                        <h1 class="u-mt-l">Start study</h1>
+                        <h1 class="u-mt-l">{{if .welsh}}Dechrau'r astudiaeth{{else}}Start study{{end}}</h1>
                         <form method="post" action="/auth/login">
                             <div class="panel panel--{{ if .error}}error{{else}}info{{end}} panel--no-title u-mb-s" id="uac">
                                 <span class="u-vh">Important information: </span>
@@ -122,13 +122,13 @@
                                         {{else}}
                                             Access study
                                         {{end}}
-                                        {{ template "btn_loading_svg" }}
+                                        {{ template "btn_loading_svg" (WrapWelsh .welsh)}}
                                     </span>
                                 </button>
                             </div>
                         </form>
 
-                        <div id="collapsible" class="collapsible js-collapsible u-mt-m" data-btn-close="Hide this">
+                        <div id="collapsible" class="collapsible js-collapsible u-mt-m" data-btn-close="{{if .welsh}}Cuddio hwn{{else}}Hide this{{end}}">
                             <div class="collapsible__heading js-collapsible-heading">
                                 <div class="collapsible__controls">
                                 <h2 class="collapsible__title">
@@ -218,7 +218,7 @@
                 </div>
             </div>
         </div>
-        {{ template "footer" }}
+        {{ template "footer" (WrapWelsh .welsh)}}
     </div>
 </div>
 {{ if not .uac16 }}

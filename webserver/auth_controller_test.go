@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"html/template"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -56,6 +57,9 @@ var _ = Describe("Auth Controller", func() {
 		httpRouter = gin.Default()
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+        httpRouter.SetFuncMap(template.FuncMap{
+            "WrapWelsh": webserver.WrapWelsh,
+        })
 		httpRouter.LoadHTMLGlob("../templates/*")
 		authController.Logger = observedLogger
 		authController.AddRoutes(httpRouter)
