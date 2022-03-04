@@ -23,7 +23,7 @@
                             </span>
                             <div class="panel__body svg-icon-margin--xl">
                                 {{if .welsh}}
-                                    <h1>WELSH Your progress has been saved</h1>
+                                    <h1>Mae eich atebion wedi cael eu cadw.</h1>
                                 {{else}}
                                     <h1>Your progress has been saved</h1>
                                 {{end}}
@@ -34,9 +34,25 @@
                             <span class="u-vh">Warning: </span>
                             <div class="panel__body">
                                 {{if .welsh}}
-                                    <p>WELSH Keep your {{if .uac16}}16-cahaaracter{{else}}12-digit{{end}} access code safe. You will need to enter it again to <a href="/">access your study</a>.</p>
+                                    <p>Cadwch eich cod mynediad sy'n cynnwys
+                                        {{if .uac16}}
+                                            16 o nodau
+                                        {{else}}
+                                            12 o nodau
+                                        {{end}}
+                                        yn ddiogel. Bydd angen i chi roi eich cod eto er mwyn
+                                            <a href="/">mynd at eich astudiaeth</a>.
+                                    </p>
                                 {{else}}
-                                    <p>Keep your {{if .uac16}}16-cahaaracter{{else}}12-digit{{end}} access code safe. You will need to enter it again to <a href="/">access your study</a>.</p>
+                                    <p>Keep your
+                                        {{if .uac16}}
+                                            16-cahaaracter
+                                        {{else}}
+                                            12-digit
+                                        {{end}}
+                                        access code safe. You will need to enter it again to
+                                            <a href="/">access your study</a>.
+                                    </p>
                                 {{end}}
                             </div>
                         </div>

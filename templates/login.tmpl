@@ -8,7 +8,7 @@
     <div class="page__content">
         <a class="skip__link" href="#main-content">
             {{if .welsh}}
-                WELSH Skip to main content
+                Neidio i'r prif gynnwys
             {{else}}
                 Skip to main content
             {{end}}</a>
@@ -23,7 +23,7 @@
                             <div class="panel__header">
                                 <h2 id="error-summary-title" data-qa="error-header" class="panel__title u-fs-r--b">
                                     {{ if .welsh }}
-                                        WELSH There is a problem with this page
+                                        Mae problem gyda'r dudalen hon
                                     {{else}}
                                         There is a problem with this page
                                     {{end}}
@@ -64,9 +64,9 @@
                                         <label class="label  label--with-description " for="uac">
                                             {{if .welsh}}
                                                 {{if .uac16}}                                                
-                                                    WELSH Enter your 16-character access code
+                                                    Rhowch eich cod mynediad sy'n cynnwys 16 o nodau
                                                 {{else}}
-                                                    WELSH Enter your 12-digit access code
+                                                    Rhowch eich cod mynediad sy'n cynnwys 12 o nodau
                                                 {{end}}
                                             {{else}}
                                                 {{if .uac16}}
@@ -78,7 +78,7 @@
                                         </label>
                                         <span id="description-hint" class="label__description  input--with-description">
                                             {{if .welsh}}
-                                                WELSH keep this code safe. You will need to enter it every time you access your study.
+                                                Cadwch y cod hwn yn ddiogel. Bydd angen i chi roi eich cod bob tro y byddwch chi'n mynd at eich astudiaeth.
                                             {{else}}
                                                 Keep this code safe. You will need to enter it every time you access your study.
                                             {{end}}
@@ -108,7 +108,7 @@
                                 </span>
                                 <div class="panel__body">
                                     {{if .welsh}}
-                                        WELSH Your personal information is protected by law and will be kept confidential
+                                        Mae eich gwybodaeth bersonol wedi'i diogelu gan y gyfraith a chaiff ei chadw'n gyfrinachol
                                     {{else}}
                                         Your personal information is protected by law and will be kept confidential
                                     {{end}}
@@ -133,7 +133,7 @@
                                 <div class="collapsible__controls">
                                 <h2 class="collapsible__title">
                                 {{if .welsh}}
-                                    WELSH Where to find your access code
+                                    Ble i ddod o hyd i'ch cod mynediad
                                 {{else}}
                                     Where to find your access code
                                 {{end}}
@@ -149,21 +149,68 @@
 
                             <p>
                             {{if .welsh}}
-                                WELSH To start your online study, you will need the {{if .uac16}}16-character{{else}}12-digit{{end}} access code printed on the letter we sent you. {{if .uac16}}Your 16-character access code will be a combination of letters and numbers.{{else}} {{end}}</p>
-                                <p><img {{if .uac16}}src="/assets/images/ONS-online-studies-letter-16-character-welsh.svg" {{else}}src="/assets/images/ONS-online-studies-letter-12-digit-welsh.svg" {{end}} alt="WELSH An example of the study letter showing that the access code is in the centre of the letter"></p>
+                                I ddechrau eich astudiaeth ar-lein, bydd angen cod mynediad sy'n cynnwys
+                                {{if .uac16}}
+                                    16 o nodau arnoch.
+                                {{else}}
+                                    12 o nodau arnoch.
+                                {{end}}
+
+                                Mae hwn wedi'i argraffu ar y llythyr y gwnaethom ei anfon atoch.
+                                {{if .uac16}}
+                                    Bydd eich cod 16 o nodau yn gymysg o lythrennau a rhifau.
+                                {{else}}
+                                {{end}}
+
+                                </p>
+                                <p><img
+                                {{if .uac16}}
+                                    src="/assets/images/ONS-online-studies-letter-16-character-welsh.svg"
+                                {{else}}
+                                    src="/assets/images/ONS-online-studies-letter-12-digit-welsh.svg"
+                                {{end}}
+
+                                alt="Enghraifft o lythyren yr astudiaeth yn dangos bod y cod mynediad yng nghanol y llythyren"></p>
+
                             {{else}}
-                                To start your online study, you will need the {{if .uac16}}16-character{{else}}12-digit{{end}} access code printed on the letter we sent you. {{if .uac16}}Your 16-character access code will be a combination of letters and numbers.{{else}} {{end}}</p>
-                                <p><img {{if .uac16}}src="/assets/images/ONS-online-studies-letter-16-character.svg" {{else}}src="/assets/images/ONS-online-studies-letter-12-digit.svg" {{end}} alt="An example of the study letter showing that the access code is in the centre of the letter"></p>
+                                To start your online study, you will need the
+                                {{if .uac16}}
+                                    16-character
+                                {{else}}
+                                    12-digit
+                                {{end}}
+
+                                access code printed on the letter we sent you.
+                                {{if .uac16}}
+                                    Your 16-character access code will be a combination of letters and numbers.
+                                {{else}}
+                                {{end}}
+
+                                </p>
+                                <p><img
+                                {{if .uac16}}
+                                    src="/assets/images/ONS-online-studies-letter-16-character.svg"
+                                {{else}}
+                                    src="/assets/images/ONS-online-studies-letter-12-digit.svg"
+                                {{end}}
+                                    alt="An example of the study letter showing that the access code is in the centre of the letter"></p>
                             {{end}}
+
                             <button type="button" class="btn js-collapsible-button u-d-no btn--secondary btn--small" aria-hidden="true">
                                 <span class="btn__inner js-collapsible-button-inner">
                                 {{if .welsh}}
-                                    WELSH Hide this
+                                    Cuddio hwn
                                 {{else}}
                                     Hide this
                                 {{end}}
+
                                 </span>
-                                <span class="btn__context u-vh">Where to find your access code?</span>
+                                {{if .welsh}}
+                                    <span class="btn__context u-vh">Ble i ddod o hyd i'ch cod mynediad?</span>
+                                {{else}}
+                                    <span class="btn__context u-vh">Where to find your access code?</span>
+                                {{end}}
+
                             </button>
                         </div>
 
