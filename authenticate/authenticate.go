@@ -8,6 +8,7 @@ import (
 
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -37,12 +38,13 @@ type AuthInterface interface {
 }
 
 type Auth struct {
-	BusApi        busapi.BusApiInterface
-	JWTCrypto     JWTCryptoInterface
-	BlaiseRestApi blaiserestapi.BlaiseRestApiInterface
-	Logger        *zap.Logger
-	UacKind       string
-	CSRFManager   csrf.CSRFManager
+	BusApi          busapi.BusApiInterface
+	JWTCrypto       JWTCryptoInterface
+	BlaiseRestApi   blaiserestapi.BlaiseRestApiInterface
+	Logger          *zap.Logger
+	UacKind         string
+	CSRFManager     csrf.CSRFManager
+	LanguageManager languagemanager.LanguageManagerInterface
 }
 
 func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
@@ -175,13 +177,15 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 		auth.notAuth(context)
 		return
 	}
-	context.HTML(http.StatusOK, "logout.tmpl", gin.H{})
+	context.HTML(http.StatusOK, "logout.tmpl", gin.H{"welsh": auth.LanguageManager.IsWelsh(context)})
 }
 
 func (auth *Auth) notAuth(context *gin.Context) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
 		"uac16":      auth.isUac16(),
-		"csrf_token": auth.CSRFManager.GetToken(context)})
+		"csrf_token": auth.CSRFManager.GetToken(context),
+		"welsh":      auth.LanguageManager.IsWelsh(context),
+	})
 	context.Abort()
 }
 
@@ -189,12 +193,14 @@ func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
 		"error":      errorMessage,
 		"uac16":      auth.isUac16(),
-		"csrf_token": auth.CSRFManager.GetToken(context)})
+		"csrf_token": auth.CSRFManager.GetToken(context),
+		"welsh":      auth.LanguageManager.IsWelsh(context),
+	})
 	context.Abort()
 }
 
 func (auth *Auth) InstrumentNotInstalledError(context *gin.Context) {
-	context.HTML(http.StatusOK, "not_live.tmpl", gin.H{})
+	context.HTML(http.StatusOK, "not_live.tmpl", gin.H{"welsh": auth.LanguageManager.IsWelsh(context)})
 	context.Abort()
 }
 

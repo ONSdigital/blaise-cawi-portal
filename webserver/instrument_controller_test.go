@@ -223,6 +223,7 @@ var _ = Describe("Open Case", func() {
 
 		Context("Blaise returns a non 200 status code", func() {
 			JustBeforeEach(func() {
+				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(500, "Sad face"))
 
