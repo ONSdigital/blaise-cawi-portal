@@ -82,7 +82,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 	)
 	if err != nil {
 		instrumentController.Logger.Error("Error launching blaise study", append(uacClaim.LogFields(), zap.Error(err))...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 
@@ -90,7 +90,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 	if err != nil {
 		instrumentController.Logger.Error("Error launching blaise study, cannot read response body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 
@@ -102,7 +102,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 				zap.Int("RespStatusCode", resp.StatusCode),
 				zap.ByteString("RespBody", body),
 			)...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 
@@ -144,7 +144,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	if err != nil {
 		instrumentController.Logger.Error("Error reading start interview request body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
 
@@ -152,7 +152,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	if err != nil {
 		instrumentController.Logger.Error("Error JSON decoding start interview request",
 			append(uacClaim.LogFields(), zap.Error(err))...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
 
@@ -170,7 +170,7 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 	remote, err := url.Parse(instrumentController.CatiUrl)
 	if err != nil {
 		instrumentController.Logger.Error("Could not parse url for proxying", zap.String("URL", instrumentController.CatiUrl))
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 

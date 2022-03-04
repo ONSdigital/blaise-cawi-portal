@@ -18,7 +18,11 @@ type Manager struct {
 
 func (manager *Manager) IsWelsh(context *gin.Context) bool {
 	session := sessions.DefaultMany(context, manager.SessionName)
-	return session.Get("welsh").(bool)
+	switch isWelsh := session.Get("welsh").(type) {
+	case bool:
+		return isWelsh
+	}
+	return false
 }
 
 func (manager *Manager) SetWelsh(context *gin.Context, welsh bool) {
