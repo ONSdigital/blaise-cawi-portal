@@ -361,9 +361,9 @@ var _ = Describe("Auth Controller", func() {
 			It("returns the timed out page", func() {
 				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 				body := httpRecorder.Body.String()
-				Expect(body).To(ContainSubstring(`WELSH Sorry, you need to sign in again`))
-				Expect(body).To(ContainSubstring(`WELSH This is because you've been inactive for 15 minutes and your session has timed out to protect your information.`))
-				Expect(body).To(ContainSubstring(`WELSH You need to <a href="/">sign back in</a> to continue your study.`))
+				Expect(body).To(ContainSubstring(`Mae'n ddrwg gennym, mae angen i chi fewngofnodi eto`))
+				Expect(body).To(ContainSubstring(`Mae hyn oherwydd eich bod wedi bod yn anweithgar am 15 munud a bod eich sesiwn wedi cyrraedd y terfyn amser er mwyn diogelu eich gwybodaeth.`))
+				Expect(body).To(ContainSubstring(`Bydd angen i chi <a href="/">fewngofnodi eto</a> i barhau â'ch astudiaeth.`))
 			})
 		})
 	})

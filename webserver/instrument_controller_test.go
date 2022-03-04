@@ -156,7 +156,7 @@ var _ = Describe("Open Case", func() {
 				It("Returns a 403", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
 					Expect(httpRecorder.Body.String()).To(ContainSubstring(
-						`WELSH To access this page you need to <a href="/">re-enter your access code</a>.`,
+						`I fynd i'r dudalen hon, bydd angen i chi .<a href="/">roi eich cod mynediad eto</a>.`,
 					))
 
 					Expect(observedLogs.Len()).To(Equal(1))
