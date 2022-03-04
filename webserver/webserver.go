@@ -275,6 +275,15 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	httpRouter.GET("/", authController.LoginEndpoint)
 
+	httpRouter.Any("/language/:lang", func(context *gin.Context) {
+		if context.Param("lang") == "welsh" {
+			authController.LanguageManager.SetWelsh(context, true)
+		} else {
+			authController.LanguageManager.SetWelsh(context, false)
+		}
+		context.Status(200)
+	})
+
 	httpRouter.NoRoute(func(context *gin.Context) {
 		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{"welsh": languageManager.IsWelsh(context)})
 	})

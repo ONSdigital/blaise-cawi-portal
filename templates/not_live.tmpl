@@ -1,25 +1,34 @@
 <!doctype html>
 <html lang="{{if .welsh}}cy{{else}}en{{end}}">
 <head>
-{{ template "head_imports" }}
+{{ template "head_imports" (WrapWelsh .welsh) }}
 </head>
 <body>
-{{ template "header" }}
-<div class="page__container container" id="main-content">
-    <div class="grid">
-        <div class="grid__col col-8@m">
-            <main id="page-main-content" class="page__main ">
-                {{if .welsh}}
-                    <h1>Nid yw'r astudiaeth ar gael ar hyn o bryd.</h1>
-                    <p>Rhowch gynnig arall arni yn nes ymlaen neu ffoniwch ein Llinell Ymholiadau Arolwg ar 0800 085 7376 i gael help.</p>
-                    <p>Mae unrhyw atebion y gwnaethoch chi eu rhoi mewn sesiynau blaenorol wedi cael eu cofnodi'n ddiogel ac yn gyfrinachol. Dim ond at ddibenion yr ymchwil hon y caiff y rhain eu defnyddio.</p>
-                    <p>Mae unrhyw atebion y gwnaethoch chi eu rhoi mewn sesiynau blaenorol wedi cael eu cofnodi'n ddiogel ac yn gyfrinachol. Dim ond at ddibenion yr ymchwil hon y caiff y rhain eu defnyddio.</p>
-                {{else}}
-                    <h1>The study is currently unavailable</h1>
-                    <p>Please try again later or contact our Survey Enquiry Line on 0800 085 7376 for help.</p>
-                    <p>Any answers you have provided in previous sessions have been logged securely and confidentially. They will only be used for the purposes of this research.</p>
-                {{end}}
+<div class="page">
+    <div class="page__content">
+        {{ if .welsh}}
+            <a class="skip__link" href="#main-content">Neidio i'r prif gynnwys</a>
+        {{ else }}
+            <a class="skip__link" href="#main-content">Skip to main content</a>
+        {{ end }}
+{{ template "header" (WrapWelsh .welsh) }}
+        <div class="page__container container " style="min-height: calc(67vh)">
+            <div class="grid">
+                <div class="grid__col col-8@m">
+                    <main id="page-main-content" class="page__main ">
+                        {{if .welsh}}
+                            <h1>Nid yw'r astudiaeth ar gael ar hyn o bryd</h1>
+                            <p>Rhowch gynnig arall arni yn nes ymlaen neu ffoniwch ein Llinell Ymholiadau Arolwg ar 0800 085 7376 i gael help.</p>
+                            <p>Mae unrhyw atebion y gwnaethoch chi eu rhoi mewn sesiynau blaenorol wedi cael eu cofnodi'n ddiogel ac yn gyfrinachol. Dim ond at ddibenion yr ymchwil hon y caiff y rhain eu defnyddio.</p>
+                        {{else}}
+                            <h1>The study is currently unavailable</h1>
+                            <p>Please try again later or contact our Survey Enquiry Line on 0800 085 7376 for help.</p>
+                            <p>Any answers you have provided in previous sessions have been logged securely and confidentially. They will only be used for the purposes of this research.</p>
+                        {{end}}
+                </div>
+            </div>
         </div>
+        {{ template "footer" (WrapWelsh .welsh)}}
     </div>
 </div>
 </body>

@@ -1,6 +1,8 @@
 package languagemanager
 
 import (
+	"fmt"
+
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
@@ -28,4 +30,8 @@ func (manager *Manager) IsWelsh(context *gin.Context) bool {
 func (manager *Manager) SetWelsh(context *gin.Context, welsh bool) {
 	session := sessions.DefaultMany(context, manager.SessionName)
 	session.Set("welsh", welsh)
+	err := session.Save()
+	if err != nil {
+		fmt.Printf("Error saving session: %s\n", err)
+	}
 }
