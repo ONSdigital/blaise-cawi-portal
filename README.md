@@ -36,6 +36,12 @@ gcloud iam service-accounts keys create blaise.json --iam-account ons-blaise-v2-
 
 BUS CLient ID:
 
+Open a tunnel to the rest-api:
+
+```sh
+gcloud compute start-iap-tunnel restapi-1 80 --local-host-port=localhost:8001
+```
+
 ```sh
 BLAISE_ENV=<blaise-env>
 export BLAISE_ENV
@@ -46,6 +52,7 @@ export BUS_CLIENT_ID
 ```
 
 ```sh
+BLAISE_REST_API=http://localhost:8001 \
 DEV_MODE=true \
 GOOGLE_APPLICATION_CREDENTIALS=blaise.json \
 BUS_CLIENT_ID=${BUS_CLIENT_ID} \
