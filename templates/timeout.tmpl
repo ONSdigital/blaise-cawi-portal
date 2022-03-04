@@ -6,7 +6,11 @@
 <body>
 <div class="page">
     <div class="page__content">
-        <a class="skip__link" href="#main-content">Skip to main content</a>
+        {{ if .welsh}}
+            <a class="skip__link" href="#main-content">Neidio i'r prif gynnwys</a>
+        {{ else }}
+            <a class="skip__link" href="#main-content">Skip to main content</a>
+        {{ end }}
         {{ template "header" }}
         <div class="page__container container " style="min-height: calc(67vh)">
             <div class="grid">
