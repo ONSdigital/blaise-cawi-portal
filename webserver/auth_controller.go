@@ -39,7 +39,7 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 		return
 	}
 
-	requestedLang := languagemanager.GetLangFromParam(context)
+	requestedLang := languagemanager.GetLangFromQuery(context)
 	currentlyWelsh := authController.LanguageManager.IsWelsh(context)
 	if requestedLang == "en" && currentlyWelsh {
 		authController.LanguageManager.SetWelsh(context, false)
