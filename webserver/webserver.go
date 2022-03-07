@@ -276,10 +276,10 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.GET("/", authController.LoginEndpoint)
 
 	httpRouter.Any("/language/:lang", func(context *gin.Context) {
-		if context.Param("lang") == "welsh" {
-			authController.LanguageManager.SetWelsh(context, true)
+		if languagemanager.GetLangFromParam(context) == "welsh" {
+			languageManager.SetWelsh(context, true)
 		} else {
-			authController.LanguageManager.SetWelsh(context, false)
+			languageManager.SetWelsh(context, false)
 		}
 		context.Status(200)
 	})
