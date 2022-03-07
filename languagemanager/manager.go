@@ -12,6 +12,7 @@ import (
 type LanguageManagerInterface interface {
 	IsWelsh(*gin.Context) bool
 	SetWelsh(*gin.Context, bool)
+	LanguageError(map[string]string, *gin.Context) string
 }
 
 type Manager struct {
@@ -34,4 +35,11 @@ func (manager *Manager) SetWelsh(context *gin.Context, welsh bool) {
 	if err != nil {
 		fmt.Printf("Error saving session: %s\n", err)
 	}
+}
+
+func (manager *Manager) LanguageError(err map[string]string, context *gin.Context) string {
+	if manager.IsWelsh(context) {
+		return err["welsh"]
+	}
+	return err["english"]
 }

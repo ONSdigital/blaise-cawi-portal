@@ -55,7 +55,7 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 	uacClaim, err := instrumentController.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
 		instrumentController.Logger.Error("Error decrypting JWT", zap.Error(err))
-		instrumentController.Auth.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
+		instrumentController.Auth.NotAuthWithError(context, instrumentController.LanguageManager.LanguageError(authenticate.INTERNAL_SERVER_ERR, context))
 		return nil, err
 	}
 	instrumentName := context.Param("instrumentName")
