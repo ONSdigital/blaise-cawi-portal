@@ -2,11 +2,11 @@ package authenticate_test
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"html/template"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	mockauth "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -58,6 +58,7 @@ var _ = Describe("Login", func() {
 		observedLogger := zap.New(observedZapCore)
 		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
 		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+		languageManagerMock.On("LanguageError", mock.Anything, mock.Anything).Return("Access code not recognised. Enter the code again")
 		auth = &authenticate.Auth{
 			JWTCrypto:       jwtCrypto,
 			Logger:          observedLogger,
@@ -65,9 +66,9 @@ var _ = Describe("Login", func() {
 			LanguageManager: languageManagerMock,
 		}
 		httpRouter = gin.Default()
-        httpRouter.SetFuncMap(template.FuncMap{
-            "WrapWelsh": webserver.WrapWelsh,
-        })
+		httpRouter.SetFuncMap(template.FuncMap{
+			"WrapWelsh": webserver.WrapWelsh,
+		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
@@ -147,7 +148,7 @@ var _ = Describe("Login", func() {
 				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
 				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `Access code not recognised. Enter the code again`)).To(BeTrue())
+				Expect(string(body)).To(ContainSubstring(`Access code not recognised. Enter the code again`))
 
 				Expect(observedLogs.Len()).To(Equal(1))
 				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
@@ -440,9 +441,9 @@ var _ = Describe("Login", func() {
 		BeforeEach(func() {
 			languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 			httpRouter = gin.Default()
-            httpRouter.SetFuncMap(template.FuncMap{
-                "WrapWelsh": webserver.WrapWelsh,
-            })
+			httpRouter.SetFuncMap(template.FuncMap{
+				"WrapWelsh": webserver.WrapWelsh,
+			})
 			httpRouter.LoadHTMLGlob("../templates/*")
 			store := cookie.NewStore([]byte("secret"))
 			httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
@@ -495,9 +496,9 @@ var _ = Describe("AuthenticatedWithUac", func() {
 	BeforeEach(func() {
 		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 		httpRouter = gin.Default()
-        httpRouter.SetFuncMap(template.FuncMap{
-            "WrapWelsh": webserver.WrapWelsh,
-        })
+		httpRouter.SetFuncMap(template.FuncMap{
+			"WrapWelsh": webserver.WrapWelsh,
+		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
@@ -615,9 +616,9 @@ var _ = Describe("Has Session", func() {
 		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
 		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 		httpRouter = gin.Default()
-        httpRouter.SetFuncMap(template.FuncMap{
-            "WrapWelsh": webserver.WrapWelsh,
-        })
+		httpRouter.SetFuncMap(template.FuncMap{
+			"WrapWelsh": webserver.WrapWelsh,
+		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))

@@ -79,7 +79,7 @@ var _ = Describe("Open Case", func() {
 		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
 		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
 		observedLogger := zap.New(observedZapCore)
 		observedLogger.Sync()
@@ -208,6 +208,7 @@ var _ = Describe("Open Case", func() {
 
 		Context("When failing to decrupt a JWT", func() {
 			JustBeforeEach(func() {
+				languageManagerMock.On("LanguageError", mock.Anything, mock.Anything).Return("We were unable to process your request, please try again")
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockAuth.On("NotAuthWithError", mock.Anything, mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(nil, errors.New("No JWT"))
