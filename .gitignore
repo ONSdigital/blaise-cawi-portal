@@ -1,6 +1,5 @@
-cover.out
+coverage.out
 /.idea/
-blaise.json
-blaise-dev.json
+*.json
 app.yaml
 .DS_Store

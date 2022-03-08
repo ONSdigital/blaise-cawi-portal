@@ -8,6 +8,7 @@ import (
 
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -19,10 +20,22 @@ const (
 	SESSION_TIMEOUT_KEY = "session_timeout"
 	JWT_TOKEN_KEY       = "jwt_token"
 	SESSION_VALID_KEY   = "session_valid"
-	INVALID_LENGTH_ERR  = "Enter your %s access code"
-	NOT_RECOGNISED_ERR  = "Access code not recognised. Enter the code again"
-	INTERNAL_SERVER_ERR = "We were unable to process your request, please try again"
 	ISSUER              = "social-surveys-web-portal"
+)
+
+var (
+	INVALID_LENGTH_ERR = map[string]string{
+		"english": "Enter your %s access code",
+		"welsh":   "Rhowch eich cod mynediad sy'n cynnwys %s",
+	}
+	NOT_RECOGNISED_ERR = map[string]string{
+		"english": "Access code not recognised. Enter the code again",
+		"welsh":   "Nid yw'r cod mynediad yn cael ei gydnabod. Rhowch y cod eto",
+	}
+	INTERNAL_SERVER_ERR = map[string]string{
+		"english": "We were unable to process your request, please try again",
+		"welsh":   "Ni allwn brosesu eich cais, rhowch gynnig arall arni",
+	}
 )
 
 //Generate mocks by running "go generate ./..."
@@ -37,12 +50,13 @@ type AuthInterface interface {
 }
 
 type Auth struct {
-	BusApi        busapi.BusApiInterface
-	JWTCrypto     JWTCryptoInterface
-	BlaiseRestApi blaiserestapi.BlaiseRestApiInterface
-	Logger        *zap.Logger
-	UacKind       string
-	CSRFManager   csrf.CSRFManager
+	BusApi          busapi.BusApiInterface
+	JWTCrypto       JWTCryptoInterface
+	BlaiseRestApi   blaiserestapi.BlaiseRestApiInterface
+	Logger          *zap.Logger
+	UacKind         string
+	CSRFManager     csrf.CSRFManager
+	LanguageManager languagemanager.LanguageManagerInterface
 }
 
 func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
@@ -86,7 +100,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	if uac == "" {
 		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Blank UAC"))...)
-		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, auth.uacError()))
+		auth.NotAuthWithError(context, auth.uacError(context))
 		return
 	}
 
@@ -97,7 +111,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	if len(uac) != uacLength {
 		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Invalid UAC length"), zap.Int("UACLength", uacLength))...)
-		auth.NotAuthWithError(context, fmt.Sprintf(INVALID_LENGTH_ERR, auth.uacError()))
+		auth.NotAuthWithError(context, auth.uacError(context))
 		return
 	}
 
@@ -109,7 +123,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 			zap.String("CaseID", uacInfo.CaseID),
 			zap.Error(err),
 		)...)
-		auth.NotAuthWithError(context, NOT_RECOGNISED_ERR)
+		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(NOT_RECOGNISED_ERR, context))
 		return
 	}
 
@@ -131,7 +145,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 			zap.String("CaseID", uacInfo.CaseID),
 			zap.Error(err),
 		)...)
-		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
+		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
 		return
 	}
 
@@ -142,7 +156,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo, sessionTimeout)
 	if err != nil {
 		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
-		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
+		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
 		return
 	}
 
@@ -150,7 +164,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	session.Set(SESSION_TIMEOUT_KEY, sessionTimeout)
 	if err := session.Save(); err != nil {
 		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
-		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
+		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
 		return
 	}
 
@@ -158,7 +172,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	validationSession.Set(SESSION_VALID_KEY, true)
 	if err := validationSession.Save(); err != nil {
 		auth.Logger.Error("Failed to save validationSession", zap.Error(err))
-		auth.NotAuthWithError(context, INTERNAL_SERVER_ERR)
+		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
 		return
 	}
 
@@ -175,13 +189,15 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 		auth.notAuth(context)
 		return
 	}
-	context.HTML(http.StatusOK, "logout.tmpl", gin.H{})
+	context.HTML(http.StatusOK, "logout.tmpl", gin.H{"welsh": auth.LanguageManager.IsWelsh(context)})
 }
 
 func (auth *Auth) notAuth(context *gin.Context) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
 		"uac16":      auth.isUac16(),
-		"csrf_token": auth.CSRFManager.GetToken(context)})
+		"csrf_token": auth.CSRFManager.GetToken(context),
+		"welsh":      auth.LanguageManager.IsWelsh(context),
+	})
 	context.Abort()
 }
 
@@ -189,12 +205,14 @@ func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
 		"error":      errorMessage,
 		"uac16":      auth.isUac16(),
-		"csrf_token": auth.CSRFManager.GetToken(context)})
+		"csrf_token": auth.CSRFManager.GetToken(context),
+		"welsh":      auth.LanguageManager.IsWelsh(context),
+	})
 	context.Abort()
 }
 
 func (auth *Auth) InstrumentNotInstalledError(context *gin.Context) {
-	context.HTML(http.StatusOK, "not_live.tmpl", gin.H{})
+	context.HTML(http.StatusOK, "not_live.tmpl", gin.H{"welsh": auth.LanguageManager.IsWelsh(context)})
 	context.Abort()
 }
 
@@ -245,14 +263,20 @@ func (auth *Auth) isUac16() bool {
 	return auth.UacKind == "uac16"
 }
 
-func (auth *Auth) uacError() string {
-	if auth.isUac16() {
-		return "16-character"
+func (auth *Auth) uacError(context *gin.Context) string {
+	if auth.LanguageManager.IsWelsh(context) {
+		if auth.isUac16() {
+			return fmt.Sprintf(INVALID_LENGTH_ERR["welsh"], "16 o nodau")
+		}
+		return fmt.Sprintf(INVALID_LENGTH_ERR["welsh"], "12 o nodau")
 	}
-	return "12-digit"
+	if auth.isUac16() {
+		return fmt.Sprintf(INVALID_LENGTH_ERR["english"], "16-character")
+	}
+	return fmt.Sprintf(INVALID_LENGTH_ERR["english"], "12-digit")
 }
 
-func Forbidden(context *gin.Context) {
-	context.HTML(http.StatusForbidden, "access_denied.tmpl", gin.H{})
+func Forbidden(context *gin.Context, welsh bool) {
+	context.HTML(http.StatusForbidden, "access_denied.tmpl", gin.H{"welsh": welsh})
 	context.Abort()
 }

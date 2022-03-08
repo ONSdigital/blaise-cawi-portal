@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	languageManagerMocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -63,7 +65,8 @@ var _ = Describe("Open Case", func() {
 		responseInfo         = "<html><head></head><body></body></html>"
 		mockAuth             = &mocks.AuthInterface{}
 		mockJWTCrypto        = &mocks.JWTCryptoInterface{}
-		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}, Auth: mockAuth, JWTCrypto: mockJWTCrypto}
+		languageManagerMock  = &languageManagerMocks.LanguageManagerInterface{}
+		instrumentController = &webserver.InstrumentController{CatiUrl: catiUrl, HttpClient: &http.Client{}, Auth: mockAuth, JWTCrypto: mockJWTCrypto, LanguageManager: languageManagerMock}
 		requestBody          io.Reader
 		observedLogs         *observer.ObservedLogs
 		observedZapCore      zapcore.Core
@@ -71,9 +74,12 @@ var _ = Describe("Open Case", func() {
 
 	BeforeEach(func() {
 		httpRouter = gin.Default()
+		httpRouter.SetFuncMap(template.FuncMap{
+			"WrapWelsh": webserver.WrapWelsh,
+		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
+		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
 		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
 		observedLogger := zap.New(observedZapCore)
 		observedLogger.Sync()
@@ -86,7 +92,9 @@ var _ = Describe("Open Case", func() {
 	AfterEach(func() {
 		httpmock.DeactivateAndReset()
 		mockAuth = &mocks.AuthInterface{}
+		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
 		instrumentController.Auth = mockAuth
+		instrumentController.LanguageManager = languageManagerMock
 		mockJWTCrypto = &mocks.JWTCryptoInterface{}
 		instrumentController.JWTCrypto = mockJWTCrypto
 	})
@@ -95,6 +103,8 @@ var _ = Describe("Open Case", func() {
 		Context("Launching Blaise in Cawi mode with a valid instrument and case id", func() {
 			Context("and the script can be injected", func() {
 				JustBeforeEach(func() {
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+
 					mockResponse := &http.Response{
 						StatusCode: 200,
 						Header: http.Header{
@@ -125,38 +135,80 @@ var _ = Describe("Open Case", func() {
 		})
 
 		Context("Launching Blaise in Cawi mode for a different instrument", func() {
-			JustBeforeEach(func() {
-				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
-					httpmock.NewStringResponder(200, responseInfo))
+			Context("Welsh", func() {
+				BeforeEach(func() {
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
+				})
 
-				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
-				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
-					InstrumentName: instrumentName,
-					CaseID:         caseID,
-				}}, nil)
+				JustBeforeEach(func() {
+					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
+						httpmock.NewStringResponder(200, responseInfo))
 
-				httpRecorder = CreateTestResponseRecorder()
-				req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", "fwibble"), nil)
-				httpRouter.ServeHTTP(httpRecorder, req)
+					mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
+					mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+						InstrumentName: instrumentName,
+						CaseID:         caseID,
+					}}, nil)
+
+					httpRecorder = CreateTestResponseRecorder()
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", "fwibble"), nil)
+					httpRouter.ServeHTTP(httpRecorder, req)
+				})
+
+				It("Returns a 403", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(
+						`I fynd i'r dudalen hon, bydd angen i chi .<a href="/">roi eich cod mynediad eto</a>.`,
+					))
+
+					Expect(observedLogs.Len()).To(Equal(1))
+					Expect(observedLogs.All()[0].Message).To(Equal("Not authenticated for instrument"))
+					Expect(observedLogs.All()[0].ContextMap()["AuthedCaseID"]).To(Equal(caseID))
+					Expect(observedLogs.All()[0].ContextMap()["AuthedInstrumentName"]).To(Equal(instrumentName))
+					Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal("fwibble"))
+					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
+				})
 			})
 
-			It("Returns a 403", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(
-					`To access this page you need to <a href="/">re-enter your access code</a>`,
-				))
+			Context("English", func() {
+				BeforeEach(func() {
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+				})
 
-				Expect(observedLogs.Len()).To(Equal(1))
-				Expect(observedLogs.All()[0].Message).To(Equal("Not authenticated for instrument"))
-				Expect(observedLogs.All()[0].ContextMap()["AuthedCaseID"]).To(Equal(caseID))
-				Expect(observedLogs.All()[0].ContextMap()["AuthedInstrumentName"]).To(Equal(instrumentName))
-				Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal("fwibble"))
-				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
+				JustBeforeEach(func() {
+					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
+						httpmock.NewStringResponder(200, responseInfo))
+
+					mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
+					mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+						InstrumentName: instrumentName,
+						CaseID:         caseID,
+					}}, nil)
+
+					httpRecorder = CreateTestResponseRecorder()
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", "fwibble"), nil)
+					httpRouter.ServeHTTP(httpRecorder, req)
+				})
+
+				It("Returns a 403", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(
+						`To access this page you need to <a href="/">re-enter your access code</a>`,
+					))
+
+					Expect(observedLogs.Len()).To(Equal(1))
+					Expect(observedLogs.All()[0].Message).To(Equal("Not authenticated for instrument"))
+					Expect(observedLogs.All()[0].ContextMap()["AuthedCaseID"]).To(Equal(caseID))
+					Expect(observedLogs.All()[0].ContextMap()["AuthedInstrumentName"]).To(Equal(instrumentName))
+					Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal("fwibble"))
+					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
+				})
 			})
 		})
 
 		Context("When failing to decrupt a JWT", func() {
 			JustBeforeEach(func() {
+				languageManagerMock.On("LanguageError", mock.Anything, mock.Anything).Return("We were unable to process your request, please try again")
 				mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
 				mockAuth.On("NotAuthWithError", mock.Anything, mock.Anything).Return()
 				mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(nil, errors.New("No JWT"))
@@ -178,6 +230,7 @@ var _ = Describe("Open Case", func() {
 
 		Context("Blaise returns a non 200 status code", func() {
 			JustBeforeEach(func() {
+				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 				httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 					httpmock.NewJsonResponderOrPanic(500, "Sad face"))
 
@@ -256,6 +309,7 @@ var _ = Describe("Open Case", func() {
 
 		Context("When the get is for a different instrument", func() {
 			JustBeforeEach(func() {
+				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/fwibble", catiUrl, "notMyInstrument"),
 					httpmock.NewStringResponder(200, responseInfo))
 
@@ -343,6 +397,7 @@ var _ = Describe("Open Case", func() {
 
 			Context("When the case ID does not have authorisation", func() {
 				BeforeEach(func() {
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 					requestedCaseID = "notMyCaseID"
 				})
 
@@ -376,6 +431,9 @@ var _ = Describe("GET /:instrumentName/logout", func() {
 		httpRouter = gin.Default()
 		store := cookie.NewStore([]byte("secret"))
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
+		httpRouter.SetFuncMap(template.FuncMap{
+			"WrapWelsh": webserver.WrapWelsh,
+		})
 		httpRouter.LoadHTMLGlob("../templates/*")
 		instrumentController.AddRoutes(httpRouter)
 	})
