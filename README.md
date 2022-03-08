@@ -48,7 +48,6 @@ gcloud compute start-iap-tunnel restapi-1 80 --local-host-port=localhost:90 --zo
 ```
 
 Download a service account JSON key:
-
 ```
 gcloud iam service-accounts keys create keys.json --iam-account ons-blaise-v2-dev-sandbox123@appspot.gserviceaccount.com
 ```
@@ -58,17 +57,18 @@ Run the following commands to set the necessary environment variables locally:
 Unix:
 
 ```
+export BLAISE_ENV=dev-sandbox123
 export DEV_MODE=true
 export GOOGLE_APPLICATION_CREDENTIALS=keys.json
 export OAUTH_NAME=$(gcloud alpha iap oauth-brands list --format=json | jq -r '.[] | select(.applicationTitle == "blaise").name')
 export BUS_CLIENT_ID=$(gcloud alpha iap oauth-clients list "${OAUTH_NAME}" --format=json | jq -r '.[] | select(.displayName == "bus").name' | awk -F/ '{print $NF}')
-export BUS_URL="https://ons-blaise-v2-dev-sandbox123-bus.social-surveys.gcp.onsdigital.uk"
-export CATI_URL="https://ons-blaise-v2-dev-sandbox123-cati.social-surveys.gcp.onsdigital.uk"
+export BUS_URL="https://${BLAISE_ENV}-bus.social-surveys.gcp.onsdigital.uk"
+export CATI_URL="https://${BLAISE_ENV}-cati.social-surveys.gcp.onsdigital.uk"
 export JWT_SECRET=00000000000000000000000000000000
 export SESSION_SECRET=0000000000000000000000000000000000000000000000000000000000000000
 export ENCRYPTION_SECRET=00000000000000000000000000000000
 export PORT=8080
-export BLAISE_REST_API=localhost:90
+export BLAISE_REST_API=http://localhost:90
 ```
 
 Windows:
@@ -77,13 +77,13 @@ Windows:
 set DEV_MODE=true
 set GOOGLE_APPLICATION_CREDENTIALS=keys.json
 set BUS_CLIENT_ID=<get from gcp console...>
-set BUS_URL="https://ons-blaise-v2-dev-sandbox123-bus.social-surveys.gcp.onsdigital.uk"
-set CATI_URL="https://ons-blaise-v2-dev-sandbox123-cati.social-surveys.gcp.onsdigital.uk"
+set BUS_URL="https://dev-sandbox123-bus.social-surveys.gcp.onsdigital.uk"
+set CATI_URL="https://dev-sandbox123-cati.social-surveys.gcp.onsdigital.uk"
 set JWT_SECRET=00000000000000000000000000000000
 set SESSION_SECRET=0000000000000000000000000000000000000000000000000000000000000000
 set ENCRYPTION_SECRET=00000000000000000000000000000000
 set PORT=8080
-set BLAISE_REST_API=localhost:90
+set BLAISE_REST_API=http://localhost:90
 ```
 
 Run application:
