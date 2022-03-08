@@ -96,7 +96,7 @@ The UI should now be accessible via:
 
 http://localhost:8080/
 
-Run Tests:
+Run tests:
 
 ```sh
 go test ./...
