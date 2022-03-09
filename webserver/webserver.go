@@ -3,12 +3,14 @@ package webserver
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/blendle/zapdriver"
 	"github.com/gin-contrib/secure"
@@ -83,25 +85,33 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 	return logger, nil
 }
 
-func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Logger) func(*gin.Context) {
+func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Logger, languageManger languagemanager.LanguageManagerInterface) func(*gin.Context) {
 	return func(context *gin.Context) {
 		logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
+		var errorMessage string
+		isWelsh := languageManger.IsWelsh(context)
+		if isWelsh {
+			errorMessage = "Cais wedi dod i ben, triwch eto"
+		} else {
+			errorMessage = "Request timed out, please try again"
+		}
 		context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
 			"uac16":      config.UacKind == "uac16",
-			"info":       "Request timed out, please try again",
+			"info":       errorMessage,
 			"csrf_token": csrfManager.GetToken(context),
+			"welsh":      isWelsh,
 		})
 		context.Abort()
 	}
 }
 
-func NewCSRFManager(config *Config, logger *zap.Logger) csrf.CSRFManager {
+func NewCSRFManager(config *Config, logger *zap.Logger, languageManger languagemanager.LanguageManagerInterface) csrf.CSRFManager {
 	csrfManager := &csrf.DefaultCSRFManager{
 		SessionName: "session",
 		Secret:      config.SessionSecret,
 	}
 
-	csrfManager.ErrorFunc = CSRFErrorFunc(csrfManager, config, logger)
+	csrfManager.ErrorFunc = CSRFErrorFunc(csrfManager, config, logger, languageManger)
 
 	return csrfManager
 }
@@ -127,6 +137,12 @@ func UserSessionStore(config *Config) (sessions.Store, error) {
 		SameSite: http.SameSiteStrictMode,
 	})
 	return store, nil
+}
+
+func WrapWelsh(welsh bool) gin.H {
+	return gin.H{
+		"welsh": welsh,
+	}
 }
 
 type Server struct {
@@ -164,6 +180,15 @@ func (server *Server) SetupRouter() *gin.Engine {
 		SameSite: http.SameSiteStrictMode,
 	})
 
+	languageStore := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
+	languageStore.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   60 * 60 * 24 * 365, // 365 days
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
 	sessionStores := []sessions.SessionStore{
 		{
 			Name:  "session",
@@ -177,11 +202,18 @@ func (server *Server) SetupRouter() *gin.Engine {
 			Name:  "session_validation",
 			Store: store,
 		},
+		{
+			Name:  "language_session",
+			Store: languageStore,
+		},
 	}
 	httpRouter.Use(sessions.SessionsManyStores(sessionStores))
 
 	//This router has access to all templates in the templates folder
 	httpRouter.TrustedPlatform = gin.PlatformGoogleAppEngine
+	httpRouter.SetFuncMap(template.FuncMap{
+		"WrapWelsh": WrapWelsh,
+	})
 	httpRouter.LoadHTMLGlob("templates/*")
 	httpRouter.Static("/assets", "./assets")
 
@@ -200,7 +232,8 @@ func (server *Server) SetupRouter() *gin.Engine {
 		Client:     &http.Client{},
 	}
 
-	csrfManager := NewCSRFManager(server.Config, logger)
+	languageManager := &languagemanager.Manager{SessionName: "language_session"}
+	csrfManager := NewCSRFManager(server.Config, logger, languageManager)
 
 	auth := &authenticate.Auth{
 		JWTCrypto:     jwtCrypto,
@@ -210,15 +243,17 @@ func (server *Server) SetupRouter() *gin.Engine {
 			BaseUrl: server.Config.BusUrl,
 			Client:  client,
 		},
-		UacKind:     server.Config.UacKind,
-		CSRFManager: csrfManager,
+		UacKind:         server.Config.UacKind,
+		CSRFManager:     csrfManager,
+		LanguageManager: languageManager,
 	}
 
 	authController := &AuthController{
-		Auth:        auth,
-		Logger:      logger,
-		UacKind:     server.Config.UacKind,
-		CSRFManager: csrfManager,
+		Auth:            auth,
+		Logger:          logger,
+		UacKind:         server.Config.UacKind,
+		CSRFManager:     csrfManager,
+		LanguageManager: languageManager,
 	}
 
 	securityController := &SecurityController{}
@@ -227,11 +262,12 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	authController.AddRoutes(httpRouter)
 	instrumentController := &InstrumentController{
-		Auth:       auth,
-		JWTCrypto:  jwtCrypto,
-		Logger:     logger,
-		CatiUrl:    server.Config.CatiUrl,
-		HttpClient: httpClient,
+		Auth:            auth,
+		JWTCrypto:       jwtCrypto,
+		Logger:          logger,
+		CatiUrl:         server.Config.CatiUrl,
+		HttpClient:      httpClient,
+		LanguageManager: languageManager,
 	}
 	instrumentController.AddRoutes(httpRouter)
 	healthController := &HealthController{}
@@ -239,8 +275,17 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	httpRouter.GET("/", authController.LoginEndpoint)
 
+	httpRouter.Any("/language/:lang", func(context *gin.Context) {
+		if languagemanager.GetLangFromParam(context) == "welsh" {
+			languageManager.SetWelsh(context, true)
+		} else {
+			languageManager.SetWelsh(context, false)
+		}
+		context.Status(200)
+	})
+
 	httpRouter.NoRoute(func(context *gin.Context) {
-		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{})
+		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{"welsh": languageManager.IsWelsh(context)})
 	})
 
 	return httpRouter

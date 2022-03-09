@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
+	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	csrf "github.com/srbry/gin-csrf"
@@ -12,10 +13,11 @@ import (
 )
 
 type AuthController struct {
-	Auth        authenticate.AuthInterface
-	Logger      *zap.Logger
-	UacKind     string
-	CSRFManager csrf.CSRFManager
+	Auth            authenticate.AuthInterface
+	Logger          *zap.Logger
+	UacKind         string
+	CSRFManager     csrf.CSRFManager
+	LanguageManager languagemanager.LanguageManagerInterface
 }
 
 func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
@@ -37,9 +39,19 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 		return
 	}
 
+	requestedLang := languagemanager.GetLangFromQuery(context)
+	currentlyWelsh := authController.LanguageManager.IsWelsh(context)
+	if requestedLang == "en" && currentlyWelsh {
+		authController.LanguageManager.SetWelsh(context, false)
+	}
+	if requestedLang == "cy" && !currentlyWelsh {
+		authController.LanguageManager.SetWelsh(context, true)
+	}
+
 	context.HTML(http.StatusOK, "login.tmpl", gin.H{
 		"uac16":      authController.isUac16(),
 		"csrf_token": authController.CSRFManager.GetToken(context),
+		"welsh":      authController.LanguageManager.IsWelsh(context),
 	})
 }
 
@@ -74,7 +86,11 @@ func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
 	if timeout == nil || timeout == 0 {
 		timeout = authenticate.DefaultAuthTimeout
 	}
-	context.HTML(http.StatusOK, "timeout.tmpl", gin.H{"timeout": timeout})
+
+	context.HTML(http.StatusOK, "timeout.tmpl", gin.H{
+		"timeout": timeout,
+		"welsh":   authController.LanguageManager.IsWelsh(context),
+	})
 }
 
 func (authController *AuthController) isUac16() bool {
