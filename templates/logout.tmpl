@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{if .welsh}}cy{{else}}en{{end}}">
 <head>
-    {{ template "head_imports" }}
+    {{ template "head_imports" (WrapWelsh .welsh) }}
 </head>
 <body>
 <div class="page">
     <div class="page__content">
         <a class="skip__link" href="#main-content">Skip to main content</a>
-        {{ template "header" }}
+        {{ template "header" (WrapWelsh .welsh) }}
         <div class="page__container container " style="min-height: calc(67vh)">
             <div class="grid">
                 <div class="grid__col col-8@m">
@@ -22,22 +22,45 @@
                                 </svg>
                             </span>
                             <div class="panel__body svg-icon-margin--xl">
-                                <h1>Your progress has been saved</h1>
+                                {{if .welsh}}
+                                    <h1>Mae eich atebion wedi cael eu cadw.</h1>
+                                {{else}}
+                                    <h1>Your progress has been saved</h1>
+                                {{end}}
                             </div>
                         </div>
                         <div class="panel panel--warn panel--no-title u-mb-m">
                             <span class="panel__icon" aria-hidden="true">!</span>
                             <span class="u-vh">Warning: </span>
                             <div class="panel__body">
-                                <p>Keep your 12-digit access code safe. You will need to enter it again to <a
-                                        href="/">access your study</a>.</p>
+                                {{if .welsh}}
+                                    <p>Cadwch eich cod mynediad sy'n cynnwys
+                                        {{if .uac16}}
+                                            16 o nodau
+                                        {{else}}
+                                            12 o nodau
+                                        {{end}}
+                                        yn ddiogel. Bydd angen i chi roi eich cod eto er mwyn
+                                            <a href="/">mynd at eich astudiaeth</a>.
+                                    </p>
+                                {{else}}
+                                    <p>Keep your
+                                        {{if .uac16}}
+                                            16-character
+                                        {{else}}
+                                            12-digit
+                                        {{end}}
+                                        access code safe. You will need to enter it again to
+                                            <a href="/">access your study</a>.
+                                    </p>
+                                {{end}}
                             </div>
                         </div>
                     </main>
                 </div>
             </div>
         </div>
-        {{ template "footer" }}
+        {{ template "footer" (WrapWelsh .welsh) }}
     </div>
 </div>
 </body>
