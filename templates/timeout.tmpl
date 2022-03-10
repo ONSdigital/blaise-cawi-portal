@@ -1,25 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{if .welsh}}cy{{else}}en{{end}}">
 <head>
-{{ template "head_imports" }}
+{{ template "head_imports" (WrapWelsh .welsh) }}
 </head>
 <body>
 <div class="page">
     <div class="page__content">
-        <a class="skip__link" href="#main-content">Skip to main content</a>
-        {{ template "header" }}
+        {{ if .welsh}}
+            <a class="skip__link" href="#main-content">Neidio i'r prif gynnwys</a>
+        {{ else }}
+            <a class="skip__link" href="#main-content">Skip to main content</a>
+        {{ end }}
+        {{ template "header" (WrapWelsh .welsh) }}
         <div class="page__container container " style="min-height: calc(67vh)">
             <div class="grid">
                 <div class="grid__col col-8@m">
                     <main id="main-content" class="page__main ">
-                        <h1 class="u-mt-l">Sorry, you need to sign in again</h1>
-                        <p>This is because you've been inactive for {{ .timeout }} minutes and your session has timed out to protect your information.</p>
-                        <p>You need to <a href="/">sign back in</a> to continue your study.
+                        {{ if .welsh}}
+                            <h1 class="u-mt-l">Mae'n ddrwg gennym, mae angen i chi fewngofnodi eto</h1>
+                            <p>Mae hyn oherwydd eich bod wedi bod yn anweithgar am {{ .timeout }} munud a bod eich sesiwn wedi cyrraedd y terfyn amser er mwyn diogelu eich gwybodaeth.</p>
+                            <p>Bydd angen i chi <a href="/">fewngofnodi eto</a> i barhau â'ch astudiaeth.</p>
+                        {{else}}
+                            <h1 class="u-mt-l">Sorry, you need to sign in again</h1>
+                            <p>This is because you've been inactive for {{ .timeout }} minutes and your session has timed out to protect your information.</p>
+                            <p>You need to <a href="/">sign back in</a> to continue your study.
+                        {{end}}
                     </main>
                 </div>
             </div>
         </div>
-        {{ template "footer" }}
+        {{ template "footer" (WrapWelsh .welsh) }}
     </div>
 </div>
 </body>
