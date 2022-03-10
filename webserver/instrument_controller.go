@@ -14,6 +14,7 @@ import (
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
+	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -21,12 +22,13 @@ import (
 )
 
 type InstrumentController struct {
-	Auth       authenticate.AuthInterface
-	JWTCrypto  authenticate.JWTCryptoInterface
-	Logger     *zap.Logger
-	CatiUrl    string
-	HttpClient *http.Client
-	Debug      bool
+	Auth            authenticate.AuthInterface
+	JWTCrypto       authenticate.JWTCryptoInterface
+	Logger          *zap.Logger
+	CatiUrl         string
+	HttpClient      *http.Client
+	Debug           bool
+	LanguageManager languagemanager.LanguageManagerInterface
 }
 
 func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engine) {
@@ -53,14 +55,14 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 	uacClaim, err := instrumentController.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
 		instrumentController.Logger.Error("Error decrypting JWT", zap.Error(err))
-		instrumentController.Auth.NotAuthWithError(context, authenticate.INTERNAL_SERVER_ERR)
+		instrumentController.Auth.NotAuthWithError(context, instrumentController.LanguageManager.LanguageError(authenticate.INTERNAL_SERVER_ERR, context))
 		return nil, err
 	}
 	instrumentName := context.Param("instrumentName")
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
 		instrumentController.Logger.Info("Not authenticated for instrument",
 			append(uacClaim.LogFields(), zap.String("InstrumentName", instrumentName))...)
-		authenticate.Forbidden(context)
+		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return nil, fmt.Errorf("Forbidden")
 	}
 	if isAPICall(context) {
@@ -76,11 +78,11 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 	}
 	resp, err := http.PostForm(
 		fmt.Sprintf("%s/%s/default.aspx", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName),
-		blaise.CasePayload(uacClaim.UacInfo.CaseID).Form(),
+		blaise.CasePayload(uacClaim.UacInfo.CaseID, instrumentController.LanguageManager.IsWelsh(context)).Form(),
 	)
 	if err != nil {
 		instrumentController.Logger.Error("Error launching blaise study", append(uacClaim.LogFields(), zap.Error(err))...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 
@@ -88,7 +90,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 	if err != nil {
 		instrumentController.Logger.Error("Error launching blaise study, cannot read response body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 
@@ -100,7 +102,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 				zap.Int("RespStatusCode", resp.StatusCode),
 				zap.ByteString("RespBody", body),
 			)...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 
@@ -142,7 +144,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	if err != nil {
 		instrumentController.Logger.Error("Error reading start interview request body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
 
@@ -150,14 +152,14 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	if err != nil {
 		instrumentController.Logger.Error("Error JSON decoding start interview request",
 			append(uacClaim.LogFields(), zap.Error(err))...)
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
 
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
 		instrumentController.Logger.Info("Not authenticated to start interview for case",
 			append(uacClaim.LogFields(), zap.String("CaseID", startInterview.RuntimeParameters.KeyValue))...)
-		authenticate.Forbidden(context)
+		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
 	context.Request.Body = ioutil.NopCloser(&buffer)
@@ -168,7 +170,7 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 	remote, err := url.Parse(instrumentController.CatiUrl)
 	if err != nil {
 		instrumentController.Logger.Error("Could not parse url for proxying", zap.String("URL", instrumentController.CatiUrl))
-		InternalServerError(context)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 
