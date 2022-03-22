@@ -374,7 +374,7 @@ var _ = Describe("Open Case", func() {
 				requestBody = bytes.NewReader([]byte(fmt.Sprintf(`{
 						"RuntimeParameters": {
 							"KeyValue": "%s",
-							"Mode": "CAWI",
+							"Mode": "CAWI"
 						}
 					}`, requestedCaseID)))
 
