@@ -375,7 +375,6 @@ var _ = Describe("Open Case", func() {
 						"RuntimeParameters": {
 							"KeyValue": "%s",
 							"Mode": "CAWI",
-							"LayoutSet": "CAWI-Web_Large"
 						}
 					}`, requestedCaseID)))
 
