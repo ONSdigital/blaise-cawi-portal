@@ -5,7 +5,6 @@ import "net/url"
 type LaunchBlaise struct {
 	KeyValue  string `json:"KeyValue"`
 	Mode      string `json:"Mode"`
-	LayoutSet string `json:"LayoutSet"`
 	Language  string `json:"Language,omitempty"`
 }
 
@@ -21,7 +20,6 @@ func CasePayload(caseID string, welsh bool) LaunchBlaise {
 	return LaunchBlaise{
 		KeyValue:  caseID,
 		Mode:      "CAWI",
-		LayoutSet: "CAWI-Web_Large",
 		Language:  language,
 	}
 }
@@ -30,7 +28,6 @@ func (blaise LaunchBlaise) Form() url.Values {
 	formValues := url.Values{
 		"KeyValue":  {blaise.KeyValue},
 		"Mode":      {blaise.Mode},
-		"LayoutSet": {blaise.LayoutSet},
 	}
 	if blaise.Language != "" {
 		formValues["Language"] = []string{blaise.Language}
