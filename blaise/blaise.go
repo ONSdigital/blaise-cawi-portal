@@ -13,6 +13,15 @@ type StartInterview struct {
 	RuntimeParameters LaunchBlaise `json:"RuntimeParameters"`
 }
 
+type ExecuteAction struct {
+	Actions []Action `json:"Actions"`
+}
+
+type Action struct {
+	Key int `json:"Key"`
+	Value string `json:"Value"`
+}
+
 func CasePayload(caseID string, welsh bool) LaunchBlaise {
 	var language string
 	if welsh {
