@@ -113,7 +113,7 @@ var _ = Describe("Auth Controller", func() {
 				It("returns a 200 response and the login page", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<html lang="cy">`))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Astudiaeth mynediad`))
+					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Agor yr astudiaeth`))
 				})
 			})
 		})
