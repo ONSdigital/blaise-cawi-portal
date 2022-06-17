@@ -189,6 +189,7 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 		auth.notAuth(context)
 		return
 	}
+	fmt.Println(session.Get(JWT_TOKEN_KEY))
 	context.HTML(http.StatusOK, "logout.tmpl", gin.H{"welsh": auth.LanguageManager.IsWelsh(context)})
 }
 

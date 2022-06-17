@@ -133,7 +133,53 @@ func (instrumentController *InstrumentController) proxyWithInstrumentAuth(contex
 			return
 		}
 	}
+	if isExecuteActionUrl(path, resource) {
+		if !instrumentController.executeAction(context, uacClaim) {
+			return
+		}
+	}
 	instrumentController.proxy(context, uacClaim)
+}
+
+func (instrumentController *InstrumentController) setLanguage(context *gin.Context, action blaise.Action) {
+	currentlyWelsh := instrumentController.LanguageManager.IsWelsh(context)
+	languageRequest := strings.ToLower(action.Value)
+	if strings.Contains(languageRequest, "eng") && currentlyWelsh {
+		instrumentController.LanguageManager.SetWelsh(context, false)
+	}
+	if strings.Contains(languageRequest, "wls") && !currentlyWelsh {
+		instrumentController.LanguageManager.SetWelsh(context, true)
+	}
+}
+
+func (instrumentController *InstrumentController) executeAction(context *gin.Context, uacClaim *authenticate.UACClaims) bool {
+	var executeAction blaise.ExecuteAction
+	var buffer bytes.Buffer
+
+	executeActionTee := io.TeeReader(context.Request.Body, &buffer)
+	executeActionBody, err := ioutil.ReadAll(executeActionTee)
+	if err != nil {
+		instrumentController.Logger.Error("Error reading execute action request body",
+			append(uacClaim.LogFields(), zap.Error(err))...)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
+		return false
+	}
+	err = json.Unmarshal(executeActionBody, &executeAction)
+
+	if err != nil {
+		instrumentController.Logger.Error("Error JSON decoding execute action request",
+			append(uacClaim.LogFields(), zap.Error(err))...)
+		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
+		return false
+	}
+	isLanguageAction, action := checkActionLanguage(executeAction.Actions)
+	if isLanguageAction {
+		fmt.Println(action)
+		instrumentController.setLanguage(context, action)
+	}
+
+	context.Request.Body = ioutil.NopCloser(&buffer)
+	return true
 }
 
 func (instrumentController *InstrumentController) startInterviewAuth(context *gin.Context, uacClaim *authenticate.UACClaims) bool {
@@ -192,6 +238,10 @@ func isStartInterviewUrl(path, resource string) bool {
 	return fmt.Sprintf("/%s%s", path, resource) == "/api/application/start_interview"
 }
 
+func isExecuteActionUrl(path, resource string) bool {
+	return fmt.Sprintf("/%s%s", path, resource) == "/api/application/executeaction"
+}
+
 func isAPICall(context *gin.Context) bool {
 	path := context.Param("path")
 	resource := context.Param("resource")
@@ -242,4 +292,13 @@ func InjectScript(body []byte) (*html.Node, error) {
 func getContentType(resp *http.Response) string {
 	contentType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	return contentType
+}
+
+func checkActionLanguage(actions []blaise.Action) (bool, blaise.Action) {
+	for _, action := range actions {
+		if strings.Contains(strings.ToLower(action.Value), "language") {
+			return true, action
+		}
+	}
+	return false, blaise.Action{}
 }
