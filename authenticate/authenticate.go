@@ -130,8 +130,9 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	instrumentSettings, err := auth.BlaiseRestApi.GetInstrumentSettings(uacInfo.InstrumentName)
 	if err != nil {
 		if err == blaiserestapi.InstrumentNotFoundError {
-			auth.Logger.Error("Failed auth", append(utils.GetRequestSource(context),
+			auth.Logger.Warn("Failed auth", append(utils.GetRequestSource(context),
 				zap.String("Reason", "Instrument not installed"),
+				zap.String("Notes", "This can happen if a UAC for a non-Blaise 5 survey has been entered"),
 				zap.String("InstrumentName", uacInfo.InstrumentName),
 				zap.String("CaseID", uacInfo.CaseID),
 				zap.Error(err),
