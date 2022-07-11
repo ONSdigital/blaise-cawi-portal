@@ -33,7 +33,7 @@ var _ = Describe("Blaise rest api endpoints", func() {
 	Describe("Get instrument settings", func() {
 		Context("when the instrument does not exist", func() {
 			JustBeforeEach(func() {
-				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/api/v1/serverparks/%s/instruments/%s/settings", restApiUrl, serverpark, instrumentName),
+				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/api/v2/serverparks/%s/questionnaires/%s/settings", restApiUrl, serverpark, instrumentName),
 					httpmock.NewBytesResponder(404, []byte{}))
 			})
 
@@ -46,7 +46,7 @@ var _ = Describe("Blaise rest api endpoints", func() {
 
 		Context("when the instrument does exist", func() {
 			JustBeforeEach(func() {
-				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/api/v1/serverparks/%s/instruments/%s/settings", restApiUrl, serverpark, instrumentName),
+				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/api/v2/serverparks/%s/questionnaires/%s/settings", restApiUrl, serverpark, instrumentName),
 					httpmock.NewJsonResponderOrPanic(200, blaiserestapi.InstrumentSettings{
 						{
 							Type:           "StrictInterviewing",
