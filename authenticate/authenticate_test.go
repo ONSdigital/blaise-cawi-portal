@@ -111,6 +111,16 @@ var _ = Describe("Login", func() {
 			Expect(strings.Contains(string(body), `Please try again later or contact our Survey Enquiry Line on 0800 085 7376 for help.`)).To(BeTrue())
 			Expect(strings.Contains(string(body), `Any answers you have provided in previous sessions have been logged securely and confidentially. They will only be used for the purposes of this research.`)).To(BeTrue())
 		})
+
+		It("logs a warning", func() {
+			Expect(observedLogs.Len()).To(Equal(1))
+			Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+			Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Instrument not installed"))
+			Expect(observedLogs.All()[0].ContextMap()["Notes"]).To(Equal("This can happen if a UAC for a non-Blaise 5 survey has been entered"))
+			Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal("foo"))
+			Expect(observedLogs.All()[0].ContextMap()["CaseID"]).To(Equal("bar"))
+			Expect(observedLogs.All()[0].Level).To(Equal(zap.WarnLevel))
+		})
 	})
 
 	Context("When instrument settings does not error", func() {
