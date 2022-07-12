@@ -71,7 +71,7 @@ func (blaiseRestApi *BlaiseRestApi) GetInstrumentSettings(instrumentName string)
 
 func (blaiseRestApi *BlaiseRestApi) instrumentSettingsUrl(instrumentName string) string {
 	return fmt.Sprintf(
-		"%s/api/v1/serverparks/%s/instruments/%s/settings",
+		"%s/api/v2/serverparks/%s/questionnaires/%s/settings",
 		blaiseRestApi.BaseUrl,
 		blaiseRestApi.Serverpark,
 		instrumentName,
