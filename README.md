@@ -17,12 +17,32 @@ The portal can be toggled between Welsh and English languages via a link on the 
 
 ![UI](.github/ui.png)
 
-### Inialising Go
+### Initialising Go
 
 **Note**: This is a one off task per repo, but is being documented for future reference
 
 ```sh
 go mod init github.com/onsdigital/blaise-cawi-portal
+```
+
+## Resolving Go setup issues
+
+Are you getting the following error?
+
+```sh
+go: cannot find GOROOT directory: </dir/path/go/somewhere/libexec>
+```
+
+GOROOT is a variable that defines where your Go SDK is located. You do not need to change this variable, unless you plan to use different Go versions. go.mod is using Go 1.15. Ensure this is installed and point your GOROOT to the appropriate libexec folder.
+
+For example:
+
+```sh
+brew install go@1.15
+```
+
+```sh
+export GOROOT=</dir/path/something/like/go@1.15/1.15.15/libexec>
 ```
 
 ### Local Setup
