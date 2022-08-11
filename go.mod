@@ -16,6 +16,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.16.0
+	github.com/sirupsen/logrus v1.9.0
 	github.com/srbry/gin-csrf v0.0.0-20211221152635-387e490c81de
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
@@ -24,7 +25,6 @@ require (
 	go.uber.org/zap v1.20.0
 	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce // indirect
 	golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	google.golang.org/api v0.65.0
 	google.golang.org/genproto v0.0.0-20220114231437-d2e6a121cae0 // indirect
 	google.golang.org/grpc v1.43.0 // indirect
