@@ -3,6 +3,7 @@ package blaiserestapi
 import (
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 )
@@ -46,24 +47,29 @@ type BlaiseRestApi struct {
 func (blaiseRestApi *BlaiseRestApi) GetInstrumentSettings(instrumentName string) (InstrumentSettings, error) {
 	req, err := http.NewRequest("GET", blaiseRestApi.instrumentSettingsUrl(instrumentName), nil)
 	if err != nil {
+		log.Error("Failed to make new request to blaise rest api")
 		return nil, err
 	}
 	req.Header.Add("Accept", "application/json")
 	resp, err := blaiseRestApi.Client.Do(req)
 	if err != nil {
+		log.Error("Failed to get instrument settings")
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
+		log.Error(fmt.Sprintf("Questionnaire %s not found", instrumentName))
 		return nil, InstrumentNotFoundError
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		log.Error(fmt.Sprintf("Error reading response body of %s", resp.Body))
 		return nil, err
 	}
 	var instrumentSettings InstrumentSettings
 	err = json.Unmarshal(body, &instrumentSettings)
 	if err != nil {
+		log.Error(fmt.Sprintf("Could not unmarshall %s", body))
 		return nil, err
 	}
 	return instrumentSettings, nil
