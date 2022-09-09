@@ -109,7 +109,7 @@ set BLAISE_REST_API=http://localhost:90
 Run application:
 
 ```sh
- go run main.go
+go run main.go
 ```
 
 The UI should now be accessible via:
