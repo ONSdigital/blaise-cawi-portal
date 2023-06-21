@@ -15,5 +15,5 @@ func main() {
 
 	server := &webserver.Server{Config: config}
 	httpRouter := server.SetupRouter()
-	httpRouter.Run(fmt.Sprintf(":%s", config.Port))
+	httpRouter.Run(fmt.Sprintf(":%s", config.Port)) //nolint
 }

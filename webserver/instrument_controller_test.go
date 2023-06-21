@@ -38,10 +38,6 @@ func (r *TestResponseRecorder) CloseNotify() <-chan bool {
 	return r.closeChannel
 }
 
-func (r *TestResponseRecorder) closeClient() {
-	r.closeChannel <- true
-}
-
 func CreateTestResponseRecorder() *TestResponseRecorder {
 	return &TestResponseRecorder{
 		httptest.NewRecorder(),
@@ -82,7 +78,7 @@ var _ = Describe("Open Case", func() {
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
 		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
 		observedLogger := zap.New(observedZapCore)
-		observedLogger.Sync()
+		_ = observedLogger.Sync()
 		instrumentController.Logger = observedLogger
 		instrumentController.AddRoutes(httpRouter)
 		httpmock.Activate()
