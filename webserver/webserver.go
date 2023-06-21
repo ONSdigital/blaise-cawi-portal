@@ -81,7 +81,7 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer logger.Sync()
+	defer logger.Sync() //nolint
 	return logger, nil
 }
 

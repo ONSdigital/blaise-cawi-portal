@@ -110,7 +110,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		var buf bytes.Buffer
 		injectedBody, err := InjectScript(body)
 		if err == nil {
-			html.Render(&buf, injectedBody)
+			html.Render(&buf, injectedBody) //nolint
 			body = buf.Bytes()
 		} else {
 			instrumentController.Logger.Error("Error injecting check-session script",
