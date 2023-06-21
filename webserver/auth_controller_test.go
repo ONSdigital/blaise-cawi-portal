@@ -52,7 +52,7 @@ var _ = Describe("Auth Controller", func() {
 	BeforeEach(func() {
 		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
 		observedLogger = zap.New(observedZapCore)
-		observedLogger.Sync()
+		_ = observedLogger.Sync()
 		csrfManager.ErrorFunc = webserver.CSRFErrorFunc(csrfManager, config, observedLogger, languageManagerMock)
 		httpRouter = gin.Default()
 		store := cookie.NewStore([]byte("secret"))
