@@ -240,7 +240,6 @@ func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, c
 		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
 		return
 	}
-	return
 }
 
 func (auth *Auth) SessionValid(context *gin.Context) bool {
