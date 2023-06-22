@@ -15,5 +15,9 @@ func main() {
 
 	server := &webserver.Server{Config: config}
 	httpRouter := server.SetupRouter()
-	httpRouter.Run(fmt.Sprintf(":%s", config.Port)) //nolint
+// 	httpRouter.Run(fmt.Sprintf(":%s", config.Port))
+	err = httpRouter.Run(fmt.Sprintf(":%s", config.Port))
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 }
