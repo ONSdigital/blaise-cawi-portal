@@ -106,17 +106,23 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		return
 	}
 
-	if getContentType(resp) == "text/html" {
-		var buf bytes.Buffer
-		injectedBody, err := InjectScript(body)
-		if err == nil {
-			html.Render(&buf, injectedBody) //nolint
-			body = buf.Bytes()
-		} else {
-			instrumentController.Logger.Error("Error injecting check-session script",
-				append(uacClaim.LogFields(), zap.Error(err))...)
-		}
-	}
+
+    if getContentType(resp) == "text/html" {
+        var buf bytes.Buffer
+        injectedBody, err := InjectScript(body)
+        if err == nil {
+            err = html.Render(&buf, injectedBody)
+            if err == nil {
+                body = buf.Bytes()
+            } else {
+                instrumentController.Logger.Error("Error rendering HTML",
+                    append(uacClaim.LogFields(), zap.Error(err))...)
+            }
+        } else {
+            instrumentController.Logger.Error("Error injecting check-session script",
+                append(uacClaim.LogFields(), zap.Error(err))...)
+        }
+    }
 
 	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
 }
