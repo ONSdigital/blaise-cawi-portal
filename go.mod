@@ -1,6 +1,6 @@
 module github.com/ONSdigital/blaise-cawi-portal
 
-go 1.15
+go 1.19
 
 require (
 	cloud.google.com/go/compute v1.0.0 // indirect
