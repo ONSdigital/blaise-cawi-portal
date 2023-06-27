@@ -35,7 +35,7 @@ var _ = Describe("LanguageManager", func() {
 				httpRouter.GET("/", func(context *gin.Context) {
 					session := sessions.DefaultMany(context, "language_session")
 					session.Set("welsh", true)
-					session.Save()
+					_ = session.Save()
 					Expect(lanauageManager.IsWelsh(context)).To(BeTrue())
 					context.Status(200)
 				})
@@ -50,7 +50,7 @@ var _ = Describe("LanguageManager", func() {
 				httpRouter.GET("/", func(context *gin.Context) {
 					session := sessions.DefaultMany(context, "language_session")
 					session.Set("welsh", false)
-					session.Save()
+					_ = session.Save()
 					Expect(lanauageManager.IsWelsh(context)).To(BeFalse())
 				})
 
@@ -75,7 +75,7 @@ var _ = Describe("LanguageManager", func() {
 				httpRouter.GET("/", func(context *gin.Context) {
 					session := sessions.DefaultMany(context, "language_session")
 					session.Set("welsh", "foo")
-					session.Save()
+					_ = session.Save()
 					Expect(lanauageManager.IsWelsh(context)).To(BeFalse())
 				})
 

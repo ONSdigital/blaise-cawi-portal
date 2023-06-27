@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,10 +35,6 @@ type TestResponseRecorder struct {
 
 func (r *TestResponseRecorder) CloseNotify() <-chan bool {
 	return r.closeChannel
-}
-
-func (r *TestResponseRecorder) closeClient() {
-	r.closeChannel <- true
 }
 
 func CreateTestResponseRecorder() *TestResponseRecorder {
@@ -82,7 +77,7 @@ var _ = Describe("Open Case", func() {
 		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
 		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
 		observedLogger := zap.New(observedZapCore)
-		observedLogger.Sync()
+		_ = observedLogger.Sync()
 		instrumentController.Logger = observedLogger
 		instrumentController.AddRoutes(httpRouter)
 		httpmock.Activate()
@@ -110,7 +105,7 @@ var _ = Describe("Open Case", func() {
 						Header: http.Header{
 							"Content-Type": {"text/html"},
 						},
-						Body: ioutil.NopCloser(strings.NewReader(responseInfo)),
+						Body: io.NopCloser(strings.NewReader(responseInfo)),
 					}
 					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 						httpmock.ResponderFromResponse(mockResponse))

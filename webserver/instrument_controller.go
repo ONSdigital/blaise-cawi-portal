@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/http/httputil"
@@ -86,7 +85,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		return
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		instrumentController.Logger.Error("Error launching blaise study, cannot read response body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
@@ -106,17 +105,23 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		return
 	}
 
-	if getContentType(resp) == "text/html" {
-		var buf bytes.Buffer
-		injectedBody, err := InjectScript(body)
-		if err == nil {
-			html.Render(&buf, injectedBody)
-			body = buf.Bytes()
-		} else {
-			instrumentController.Logger.Error("Error injecting check-session script",
-				append(uacClaim.LogFields(), zap.Error(err))...)
-		}
-	}
+
+    if getContentType(resp) == "text/html" {
+        var buf bytes.Buffer
+        injectedBody, err := InjectScript(body)
+        if err == nil {
+            err = html.Render(&buf, injectedBody)
+            if err == nil {
+                body = buf.Bytes()
+            } else {
+                instrumentController.Logger.Error("Error rendering HTML",
+                    append(uacClaim.LogFields(), zap.Error(err))...)
+            }
+        } else {
+            instrumentController.Logger.Error("Error injecting check-session script",
+                append(uacClaim.LogFields(), zap.Error(err))...)
+        }
+    }
 
 	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
 }
@@ -140,7 +145,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	var startInterview blaise.StartInterview
 	var buffer bytes.Buffer
 	startInterviewTee := io.TeeReader(context.Request.Body, &buffer)
-	startInterviewBody, err := ioutil.ReadAll(startInterviewTee)
+	startInterviewBody, err := io.ReadAll(startInterviewTee)
 	if err != nil {
 		instrumentController.Logger.Error("Error reading start interview request body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
@@ -162,7 +167,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
-	context.Request.Body = ioutil.NopCloser(&buffer)
+	context.Request.Body = io.NopCloser(&buffer)
 	return false
 }
 
