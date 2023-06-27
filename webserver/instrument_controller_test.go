@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -106,7 +105,7 @@ var _ = Describe("Open Case", func() {
 						Header: http.Header{
 							"Content-Type": {"text/html"},
 						},
-						Body: ioutil.NopCloser(strings.NewReader(responseInfo)),
+						Body: io.NopCloser(strings.NewReader(responseInfo)),
 					}
 					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 						httpmock.ResponderFromResponse(mockResponse))
