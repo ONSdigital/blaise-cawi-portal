@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -61,7 +61,7 @@ func (blaiseRestApi *BlaiseRestApi) GetInstrumentSettings(instrumentName string)
 		log.Error(fmt.Sprintf("Questionnaire %s not found", instrumentName))
 		return nil, InstrumentNotFoundError
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error(fmt.Sprintf("Error reading response body of %s", resp.Body))
 		return nil, err

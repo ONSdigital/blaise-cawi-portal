@@ -81,7 +81,12 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer logger.Sync()
+
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			log.Println("Error occurred during logger synchronization:", err)
+		}
+	}()
 	return logger, nil
 }
 

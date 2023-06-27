@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+    "io"
 	"net/http"
 )
 
@@ -61,7 +61,7 @@ func (busApi *BusApi) doGetUacInfo(uac string) (*http.Response, error) {
 }
 
 func (busApi *BusApi) marshalUacResponse(response *http.Response) (UacInfo, error) {
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return UacInfo{}, fmt.Errorf("unable to read body")
 	}
