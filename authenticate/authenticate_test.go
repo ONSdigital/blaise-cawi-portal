@@ -460,7 +460,7 @@ var _ = Describe("Login", func() {
 			httpRouter.GET("/logout", func(context *gin.Context) {
 				session = sessions.DefaultMany(context, "user_session")
 				session.Set("foobar", "fizzbuzz")
-				session.Save()
+				_ = session.Save()
 				Expect(session.Get("foobar")).ToNot(BeNil())
 				auth.Logout(context, session)
 			})
@@ -533,11 +533,11 @@ var _ = Describe("AuthenticatedWithUac", func() {
 			httpRouter.Use(func(context *gin.Context) {
 				session = sessions.DefaultMany(context, "user_session")
 				session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
-				session.Save()
+				_ = session.Save()
 
 				sessionValidation := sessions.DefaultMany(context, "session_validation")
 				sessionValidation.Set(authenticate.SESSION_VALID_KEY, sessionValid)
-				sessionValidation.Save()
+				_ = sessionValidation.Save()
 				context.Next()
 			})
 
@@ -636,7 +636,7 @@ var _ = Describe("Has Session", func() {
 		httpRouter.Use(func(context *gin.Context) {
 			session = sessions.DefaultMany(context, "user_session")
 			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
-			session.Save()
+			_ = session.Save()
 			context.Next()
 		})
 

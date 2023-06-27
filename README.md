@@ -121,3 +121,8 @@ Run tests:
 ```sh
 go test ./...
 ```
+
+Run linter:
+```sh
+make lint
+```
