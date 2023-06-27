@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/http/httputil"
@@ -86,7 +85,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		return
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		instrumentController.Logger.Error("Error launching blaise study, cannot read response body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
@@ -146,7 +145,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	var startInterview blaise.StartInterview
 	var buffer bytes.Buffer
 	startInterviewTee := io.TeeReader(context.Request.Body, &buffer)
-	startInterviewBody, err := ioutil.ReadAll(startInterviewTee)
+	startInterviewBody, err := io.ReadAll(startInterviewTee)
 	if err != nil {
 		instrumentController.Logger.Error("Error reading start interview request body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
@@ -168,7 +167,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
-	context.Request.Body = ioutil.NopCloser(&buffer)
+	context.Request.Body = io.NopCloser(&buffer)
 	return false
 }
 
