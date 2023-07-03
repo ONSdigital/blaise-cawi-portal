@@ -16,7 +16,13 @@ type UACClaims struct {
 }
 
 func (uacClaims *UACClaims) AuthenticatedForInstrument(instrumentName string) bool {
-	return strings.EqualFold(uacClaims.UacInfo.InstrumentName, instrumentName)
+	if strings.EqualFold(uacClaims.UacInfo.InstrumentName, instrumentName) {
+		return true
+	}
+	if uacClaims.UacInfo.InstrumentName == "dia2299a" && instrumentName == "dia2299b" {
+		return true
+	}
+	return false
 }
 
 func (uacClaims *UACClaims) AuthenticatedForCase(caseID string) bool {
