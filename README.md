@@ -38,11 +38,11 @@ GOROOT is a variable that defines where your Go SDK is located. You do not need 
 For example:
 
 ```sh
-brew install go@1.15
+brew install go@1.19
 ```
 
 ```sh
-export GOROOT=</dir/path/something/like/go@1.15/1.15.15/libexec>
+export GOROOT=</dir/path/something/like/go@1.19/1.19.19/libexec>
 ```
 
 ### Local Setup
