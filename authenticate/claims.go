@@ -1,6 +1,7 @@
 package authenticate
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
@@ -19,7 +20,14 @@ func (uacClaims *UACClaims) AuthenticatedForInstrument(instrumentName string) bo
 	if strings.EqualFold(uacClaims.UacInfo.InstrumentName, instrumentName) {
 		return true
 	}
-	if uacClaims.UacInfo.InstrumentName == "dia2299a" && instrumentName == "dia2299b" {
+	return uacClaims.CheckDiaInstrument(uacClaims.UacInfo.InstrumentName, instrumentName)
+}
+
+func (uacClaims *UACClaims) CheckDiaInstrument(instrumentName1, instrumentName2 string) bool {
+	diaA, _ := regexp.MatchString(`^dia\d{4}a$`, instrumentName1)
+	diaB, _ := regexp.MatchString(`^dia\d{4}b$`, instrumentName2)
+
+	if diaA && diaB {
 		return true
 	}
 	return false
