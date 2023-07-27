@@ -25,13 +25,27 @@ var _ = Describe("Claims", func() {
 		}
 	)
 
+	DescribeTable("CheckDiaInstrument",
+		func(instrumentName1, instrumentName2 string, expected bool) {
+			// Use the checkDiaInstrument function from the imported package
+			Expect(claim.CheckDiaInstrument(instrumentName1, instrumentName2)).To(Equal(expected))
+		},
+		Entry("both diaA and diaB", "dia1234a", "dia1234b", true),
+		Entry("only diaA", "dia1234a", "notdia5678b", false),
+		Entry("only diaB", "notdia1234a", "dia5678b", false),
+		Entry("neither diaA nor diaB", "notdia1234a", "notdia5678b", false),
+		Entry("different case for diaA", "Dia1234a", "dia5678b", false),
+		Entry("different case for diaB", "dia1234a", "DIA5678B", false),
+		Entry("both in different case", "DIA1234A", "DIA5678B", false),
+		Entry("invalid names", "bacon", "ham", false),
+	)
+
 	DescribeTable("AuthenticateForInstrument",
 		func(testInstrumentName string, expected bool) {
 			Expect(claim.AuthenticatedForInstrument(testInstrumentName)).To(Equal(expected))
 		},
 		Entry("same case", instrumentName, true),
 		Entry("different case", strings.ToUpper(instrumentName), true),
-		Entry("not matching", "bacon", false),
 	)
 
 	DescribeTable("AuthenticateForCase",
