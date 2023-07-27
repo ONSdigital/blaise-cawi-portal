@@ -1,6 +1,7 @@
 package authenticate
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -24,8 +25,15 @@ func (uacClaims *UACClaims) AuthenticatedForInstrument(instrumentName string) bo
 }
 
 func (uacClaims *UACClaims) CheckDiaInstrument(instrumentName1, instrumentName2 string) bool {
-	diaA, _ := regexp.MatchString(`^dia\d{4}a$`, instrumentName1)
-	diaB, _ := regexp.MatchString(`^dia\d{4}b$`, instrumentName2)
+	diaA, diaAErr := regexp.MatchString(`^dia\d{4}a$`, instrumentName1)
+	if diaAErr != nil {
+		fmt.Print(diaAErr)
+	}
+
+	diaB, diaBErr := regexp.MatchString(`^dia\d{4}b$`, instrumentName2)
+	if diaBErr != nil {
+		fmt.Print(diaBErr)
+	}
 
 	if diaA && diaB {
 		return true
