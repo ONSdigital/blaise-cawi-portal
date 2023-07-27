@@ -30,7 +30,7 @@ var _ = Describe("Claims", func() {
 			// Use the checkDiaInstrument function from the imported package
 			Expect(claim.CheckDiaInstrument(instrumentName1, instrumentName2)).To(Equal(expected))
 		},
-		Entry("both diaA and diaB", "dia1234a", "dia5678b", true),
+		Entry("both diaA and diaB", "dia1234a", "dia1234b", true),
 		Entry("only diaA", "dia1234a", "notdia5678b", false),
 		Entry("only diaB", "notdia1234a", "dia5678b", false),
 		Entry("neither diaA nor diaB", "notdia1234a", "notdia5678b", false),
