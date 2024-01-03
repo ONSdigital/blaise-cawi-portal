@@ -177,7 +177,9 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	auth.Logger.Info("Successful Login",
+// 	auth.Logger.Info("Successful Login",
+    auth.Logger.Info(fmt.Sprintf("Successful Login with InstrumentName: %s",
+    uacInfo.InstrumentName),
 	    append(utils.GetRequestSource(context),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
 			zap.String("CaseID", uacInfo.CaseID),

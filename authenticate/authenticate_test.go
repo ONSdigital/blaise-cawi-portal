@@ -266,7 +266,7 @@ var _ = Describe("Login", func() {
 					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
 
 					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(Equal("Successful Login"))
+					Expect(observedLogs.All()[0].Message).To(ContainSubstring("Successful Login with InstrumentName: foo"))
 				})
 			})
 
