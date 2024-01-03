@@ -177,6 +177,10 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
+	auth.Logger.Info("Successful Login",
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseID", uacInfo.CaseID))
+
 	context.Redirect(http.StatusFound, fmt.Sprintf("/%s/", uacInfo.InstrumentName))
 	context.Abort()
 }
