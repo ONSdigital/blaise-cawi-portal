@@ -203,6 +203,9 @@ var _ = Describe("Login", func() {
 					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
 					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
 					Expect(session.Get(authenticate.SESSION_TIMEOUT_KEY).(int)).To(Equal(15))
+
+
+
 				})
 			})
 
@@ -261,6 +264,9 @@ var _ = Describe("Login", func() {
 					Expect(decryptedToken.UAC).To(Equal(validUAC))
 					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
 					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
+
+					Expect(observedLogs.Len()).To(Equal(1))
+					Expect(observedLogs.All()[0].Message).To(Equal("Successful Login"))
 				})
 			})
 
