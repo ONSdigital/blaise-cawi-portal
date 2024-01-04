@@ -251,20 +251,20 @@ var _ = Describe("Login", func() {
 					mockBusApi := &mocks.BusApiInterface{}
 					auth.BusApi = mockBusApi
 
-					mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "LMS2101_AA1", CaseID: "bar"}, nil)
+					mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
 				})
 
 				It("redirects to /:instrumentName/", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusFound))
-					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/LMS2101_AA1/"}))
+					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
 					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 					decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
 					Expect(decryptedToken.UAC).To(Equal(validUAC))
-					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("LMS2101_AA1"))
+					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
 					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
 
 					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(ContainSubstring("Successful auth with questionnaire: LMS2101_AA1"))
+					Expect(observedLogs.All()[0].Message).To(ContainSubstring("Successful auth with questionnaire: foo"))
 				})
 			})
 
