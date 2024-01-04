@@ -98,7 +98,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	uac = strings.ReplaceAll(uac, " ", "")
 
 	if uac == "" {
-		auth.Logger.Info("Failed Login", append(utils.GetRequestSource(context),
+		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Blank UAC"))...)
 		auth.NotAuthWithError(context, auth.uacError(context))
 		return
@@ -109,7 +109,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 
 	if len(uac) != uacLength {
-		auth.Logger.Info("Failed Login", append(utils.GetRequestSource(context),
+		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Invalid UAC length"), zap.Int("UACLength", uacLength))...)
 		auth.NotAuthWithError(context, auth.uacError(context))
 		return
@@ -117,7 +117,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
 	if err != nil || uacInfo.InvalidCase() {
-		auth.Logger.Info("Failed Login", append(utils.GetRequestSource(context),
+		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Access code not recognised"),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
 			zap.String("CaseID", uacInfo.CaseID),
@@ -130,7 +130,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	instrumentSettings, err := auth.BlaiseRestApi.GetInstrumentSettings(uacInfo.InstrumentName)
 	if err != nil {
 		if err == blaiserestapi.InstrumentNotFoundError {
-			auth.Logger.Warn("Failed Login", append(utils.GetRequestSource(context),
+			auth.Logger.Warn("Failed auth", append(utils.GetRequestSource(context),
 				zap.String("Reason", "Instrument not installed"),
 				zap.String("Notes", "This can happen if a UAC for a non-Blaise 5 survey has been entered"),
 				zap.String("InstrumentName", uacInfo.InstrumentName),
@@ -140,7 +140,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 			auth.InstrumentNotInstalledError(context)
 			return
 		}
-		auth.Logger.Error("Failed Login", append(utils.GetRequestSource(context),
+		auth.Logger.Error("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Could not get instrument settings"),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
 			zap.String("CaseID", uacInfo.CaseID),
@@ -177,7 +177,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-    auth.Logger.Info(fmt.Sprintf("Successful Login with InstrumentName: %s",
+    auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s",
     uacInfo.InstrumentName),
 	    append(utils.GetRequestSource(context),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
