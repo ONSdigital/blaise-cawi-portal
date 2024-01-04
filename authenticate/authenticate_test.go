@@ -114,7 +114,7 @@ var _ = Describe("Login", func() {
 
 		It("logs a warning", func() {
 			Expect(observedLogs.Len()).To(Equal(1))
-			Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+			Expect(observedLogs.All()[0].Message).To(Equal("Failed Login"))
 			Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Instrument not installed"))
 			Expect(observedLogs.All()[0].ContextMap()["Notes"]).To(Equal("This can happen if a UAC for a non-Blaise 5 survey has been entered"))
 			Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal("foo"))
@@ -161,7 +161,7 @@ var _ = Describe("Login", func() {
 				Expect(string(body)).To(ContainSubstring(`Access code not recognised. Enter the code again`))
 
 				Expect(observedLogs.Len()).To(Equal(1))
-				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+				Expect(observedLogs.All()[0].Message).To(Equal("Failed Login"))
 				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
 				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Access code not recognised"))
 				Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal(""))
@@ -357,7 +357,7 @@ var _ = Describe("Login", func() {
 					Expect(strings.Contains(string(body), `Enter your 12-digit access code`)).To(BeTrue())
 
 					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+					Expect(observedLogs.All()[0].Message).To(Equal("Failed Login"))
 					Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
 					Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Invalid UAC length"))
 					Expect(observedLogs.All()[0].ContextMap()["UACLength"]).To(Equal(int64(12)))
@@ -378,7 +378,7 @@ var _ = Describe("Login", func() {
 					Expect(strings.Contains(string(body), `Enter your 16-character access code`)).To(BeTrue())
 
 					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+					Expect(observedLogs.All()[0].Message).To(Equal("Failed Login"))
 					Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
 					Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Invalid UAC length"))
 					Expect(observedLogs.All()[0].ContextMap()["UACLength"]).To(Equal(int64(16)))
@@ -412,7 +412,7 @@ var _ = Describe("Login", func() {
 					Expect(strings.Contains(string(body), `Enter your 12-digit access code`)).To(BeTrue())
 
 					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+					Expect(observedLogs.All()[0].Message).To(Equal("Failed Login"))
 					Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
 					Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Blank UAC"))
 					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
@@ -432,7 +432,7 @@ var _ = Describe("Login", func() {
 					Expect(strings.Contains(string(body), `Enter your 16-character access code`)).To(BeTrue())
 					Expect(observedLogs.Len()).To(Equal(1))
 
-					Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
+					Expect(observedLogs.All()[0].Message).To(Equal("Failed Login"))
 					Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
 					Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Blank UAC"))
 					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
