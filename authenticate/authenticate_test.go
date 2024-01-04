@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
+	"testing"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	mockauth "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -204,8 +206,6 @@ var _ = Describe("Login", func() {
 					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
 					Expect(session.Get(authenticate.SESSION_TIMEOUT_KEY).(int)).To(Equal(15))
 
-
-
 				})
 			})
 
@@ -253,20 +253,20 @@ var _ = Describe("Login", func() {
 					mockBusApi := &mocks.BusApiInterface{}
 					auth.BusApi = mockBusApi
 
-					mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+					mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "LMS2101_AA1", CaseID: "bar"}, nil)
 				})
 
 				It("redirects to /:instrumentName/", func() {
 					Expect(httpRecorder.Code).To(Equal(http.StatusFound))
-					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
+					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/LMS2101_AA1/"}))
 					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
 					decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
 					Expect(decryptedToken.UAC).To(Equal(validUAC))
-					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
+					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("LMS2101_AA1"))
 					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
 
 					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(ContainSubstring("Successful Login with InstrumentName: foo"))
+					Expect(observedLogs.All()[0].Message).To(ContainSubstring("Successful Login with InstrumentName: LMS2101_AA1"))
 				})
 			})
 
@@ -700,3 +700,34 @@ var _ = Describe("Has Session", func() {
 		})
 	})
 })
+
+func TestSanitise(t *testing.T) {
+	tests := []struct {
+		input          string
+		expectedOutput string
+	}{
+		{
+			input:          "Hello\nWorld!",
+			expectedOutput: "HelloWorld!",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			result := authenticate.Sanitise(test.input)
+
+			if result != test.expectedOutput {
+				t.Errorf("Sanitise(%s) = %s, expected %s", test.input, result, test.expectedOutput)
+			}
+
+			if containsHTMLTags(result) {
+				t.Errorf("Sanitised output still contains HTML or script tags: %s", result)
+			}
+		})
+	}
+}
+
+func containsHTMLTags(s string) bool {
+	re := regexp.MustCompile(`<[^>]*>`)
+	return re.MatchString(s)
+}
