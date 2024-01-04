@@ -261,6 +261,9 @@ var _ = Describe("Login", func() {
 					Expect(decryptedToken.UAC).To(Equal(validUAC))
 					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
 					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
+
+					Expect(observedLogs.Len()).To(Equal(1))
+					Expect(observedLogs.All()[0].Message).To(ContainSubstring("Successful auth with questionnaire: foo"))
 				})
 			})
 
