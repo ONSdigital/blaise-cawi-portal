@@ -203,7 +203,6 @@ var _ = Describe("Login", func() {
 					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
 					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
 					Expect(session.Get(authenticate.SESSION_TIMEOUT_KEY).(int)).To(Equal(15))
-
 				})
 			})
 
