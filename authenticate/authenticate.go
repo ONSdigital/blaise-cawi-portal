@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"regexp"
 
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
@@ -78,16 +77,6 @@ func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
 	context.Next()
 }
 
-func Sanitise(userInput string) string {
-	sanitisedUserInput := strings.ReplaceAll(userInput, "\n", "")
-	sanitisedUserInput = strings.ReplaceAll(sanitisedUserInput, "\r", "")
-
-	re := regexp.MustCompile(`<[^>]*>`)
-	sanitisedUserInput = re.ReplaceAllString(sanitisedUserInput, "")
-
-	return sanitisedUserInput
-}
-
 func (auth *Auth) HasSession(context *gin.Context) (bool, *UACClaims) {
 	session := sessions.DefaultMany(context, "user_session")
 	jwtToken := session.Get(JWT_TOKEN_KEY)
@@ -130,8 +119,8 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	if err != nil || uacInfo.InvalidCase() {
 		auth.Logger.Info("Failed Login", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Access code not recognised"),
-			zap.String("InstrumentName", Sanitise(uacInfo.InstrumentName)),
-			zap.String("CaseID", Sanitise(uacInfo.CaseID)),
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseID", uacInfo.CaseID),
 			zap.Error(err),
 		)...)
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(NOT_RECOGNISED_ERR, context))
@@ -144,8 +133,8 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 			auth.Logger.Warn("Failed Login", append(utils.GetRequestSource(context),
 				zap.String("Reason", "Instrument not installed"),
 				zap.String("Notes", "This can happen if a UAC for a non-Blaise 5 survey has been entered"),
-				zap.String("InstrumentName", Sanitise(uacInfo.InstrumentName)),
-				zap.String("CaseID", Sanitise(uacInfo.CaseID)),
+				zap.String("InstrumentName", uacInfo.InstrumentName),
+				zap.String("CaseID", uacInfo.CaseID),
 				zap.Error(err),
 			)...)
 			auth.InstrumentNotInstalledError(context)
@@ -153,8 +142,8 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		}
 		auth.Logger.Error("Failed Login", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Could not get instrument settings"),
-			zap.String("InstrumentName", Sanitise(uacInfo.InstrumentName)),
-			zap.String("CaseID", Sanitise(uacInfo.CaseID)),
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseID", uacInfo.CaseID),
 			zap.Error(err),
 		)...)
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
@@ -189,10 +178,10 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 
     auth.Logger.Info(fmt.Sprintf("Successful Login with InstrumentName: %s",
-    Sanitise(uacInfo.InstrumentName)),
+    uacInfo.InstrumentName),
 	    append(utils.GetRequestSource(context),
-			zap.String("InstrumentName", Sanitise(uacInfo.InstrumentName)),
-			zap.String("CaseID", Sanitise(uacInfo.CaseID)),
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseID", uacInfo.CaseID),
 			)...)
 
 	context.Redirect(http.StatusFound, fmt.Sprintf("/%s/", uacInfo.InstrumentName))

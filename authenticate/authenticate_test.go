@@ -6,9 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
-	"testing"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	mockauth "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -700,34 +698,3 @@ var _ = Describe("Has Session", func() {
 		})
 	})
 })
-
-func TestSanitise(t *testing.T) {
-	tests := []struct {
-		input          string
-		expectedOutput string
-	}{
-		{
-			input:          "Hello\nWorld!",
-			expectedOutput: "HelloWorld!",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.input, func(t *testing.T) {
-			result := authenticate.Sanitise(test.input)
-
-			if result != test.expectedOutput {
-				t.Errorf("Sanitise(%s) = %s, expected %s", test.input, result, test.expectedOutput)
-			}
-
-			if containsHTMLTags(result) {
-				t.Errorf("Sanitised output still contains HTML or script tags: %s", result)
-			}
-		})
-	}
-}
-
-func containsHTMLTags(s string) bool {
-	re := regexp.MustCompile(`<[^>]*>`)
-	return re.MatchString(s)
-}
