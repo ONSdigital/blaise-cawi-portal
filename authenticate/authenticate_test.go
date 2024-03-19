@@ -621,8 +621,9 @@ var _ = Describe("Has Session", func() {
 		}
 		httpRecorder   *httptest.ResponseRecorder
 		httpRouter     *gin.Engine
-		// instrumentName = "foobar"
-		// caseID         = "fizzbuzz"
+		instrumentName = "foobar"
+		caseID         = "fizzbuzz"
+		disabled       = true
 	)
 
 	BeforeEach(func() {
@@ -666,24 +667,25 @@ var _ = Describe("Has Session", func() {
 		httpRouter.ServeHTTP(httpRecorder, req)
 	})
 
-	// Context("When someone has a session", func() {
-	// 	BeforeEach(func() {
-	// 		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
-	// 			UacInfo: busapi.UacInfo{
-	// 				InstrumentName: instrumentName,
-	// 				CaseID:         caseID,
-	// 			},
-	// 		}, nil)
-	// 	})
+	Context("When someone has a session", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
+				UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+					Disabled:       disabled,
+				},
+			}, nil)
+		})
 
-	// 	It("returns true and a claim", func() {
-	// 		Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-	// 		body := httpRecorder.Body.Bytes()
-	// 		Expect(string(body)).To(Equal(
-	// 			`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz", "disabled": true }}`,
-	// 		))
-	// 	})
-	// })
+		It("returns true and a claim", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(string(body)).To(Equal(
+				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":true}}`,
+			))
+		})
+	})
 
 	Context("When someone doesn't have a session", func() {
 		BeforeEach(func() {
