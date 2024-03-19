@@ -49,12 +49,12 @@ var _ = Describe("Claims", func() {
 	)
 
 	DescribeTable("AuthenticateForCase",
-		func(testCaseID string, expected bool) {
+		func(testCaseID string, disabled, expected bool) {
 			Expect(claim.AuthenticatedForCase(testCaseID)).To(Equal(expected))
 		},
-		Entry("same case", caseID, true),
-		Entry("different case", strings.ToUpper(caseID), true),
-		Entry("not matching", "bacon", false),
+		Entry("same case", caseID, false, true),
+		Entry("different case", strings.ToUpper(caseID),false, true),
+		Entry("not matching", "bacon",false, false),
 	)
 
 	Describe("LogFields", func() {
