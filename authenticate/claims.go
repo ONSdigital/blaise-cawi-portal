@@ -41,8 +41,15 @@ func (uacClaims *UACClaims) CheckDiaInstrument(instrumentName1, instrumentName2 
 	return false
 }
 
+// func (uacClaims *UACClaims) AuthenticatedForCase(caseID string) bool {
+// 	return strings.EqualFold(uacClaims.UacInfo.CaseID, caseID)
+// }
+
 func (uacClaims *UACClaims) AuthenticatedForCase(caseID string) bool {
-	return strings.EqualFold(uacClaims.UacInfo.CaseID, caseID)
+    if !uacClaims.UacInfo.Disabled  {
+        return strings.EqualFold(uacClaims.UacInfo.CaseID, caseID)
+    }
+    return false
 }
 
 func (uacClaims *UACClaims) LogFields() []zap.Field {
