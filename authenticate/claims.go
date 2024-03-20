@@ -46,7 +46,9 @@ func (uacClaims *UACClaims) CheckDiaInstrument(instrumentName1, instrumentName2 
 // }
 
 func (uacClaims *UACClaims) AuthenticatedForCase(caseID string) bool {
-    if !uacClaims.UacInfo.Disabled  {
+  fmt.Println("UAC Claim", uacClaims)
+  fmt.Println("UAC Disabled", uacClaims.UacInfo.Disabled)
+	if !uacClaims.UacInfo.Disabled  {
         return strings.EqualFold(uacClaims.UacInfo.CaseID, caseID)
     }
     return false
