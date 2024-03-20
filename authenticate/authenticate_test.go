@@ -623,7 +623,7 @@ var _ = Describe("Has Session", func() {
 		httpRouter     *gin.Engine
 		instrumentName = "foobar"
 		caseID         = "fizzbuzz"
-		disabled       = true
+		disabled       = false
 	)
 
 	BeforeEach(func() {
@@ -682,7 +682,7 @@ var _ = Describe("Has Session", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.Bytes()
 			Expect(string(body)).To(Equal(
-				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","Disabled":true}}`,
+				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":false}}`,
 			))
 		})
 	})
