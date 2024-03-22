@@ -1,6 +1,7 @@
 package authenticate_test
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
@@ -15,12 +16,14 @@ var _ = Describe("Claims", func() {
 	var (
 		instrumentName = "foo"
 		caseID         = "bar"
+		disabled       = false
 		claim          = &authenticate.UACClaims{
 			UAC:         "0008901",
 			AuthTimeout: 15,
 			UacInfo: busapi.UacInfo{
 				InstrumentName: instrumentName,
 				CaseID:         caseID,
+				Disabled:       disabled,
 			},
 		}
 	)
@@ -50,11 +53,15 @@ var _ = Describe("Claims", func() {
 
 	DescribeTable("AuthenticateForCase",
 		func(testCaseID string, disabled, expected bool) {
+			  fmt.Println("Test Case ID:", testCaseID)
+        fmt.Println("Case ID:", caseID)
+
 			Expect(claim.AuthenticatedForCase(testCaseID)).To(Equal(expected))
 		},
 		Entry("same case", caseID, false, true),
-		Entry("different case", strings.ToUpper(caseID),false, true),
-		Entry("not matching", "bacon",false, false),
+		Entry("different case", strings.ToUpper(caseID), false, true),
+		Entry("not matching", "bacon", false, false),
+		Entry("is not authenticated when UAC is disabled", caseID, true, false),
 	)
 
 	Describe("LogFields", func() {
