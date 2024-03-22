@@ -53,9 +53,8 @@ var _ = Describe("Claims", func() {
 
 	DescribeTable("AuthenticateForCase",
 		func(testCaseID string, disabled, expected bool) {
-			  fmt.Println("Test Case ID:", testCaseID)
-        fmt.Println("Case ID:", caseID)
-
+        fmt.Println("Disabled:", disabled)
+				claim.Disabled = disabled
 			Expect(claim.AuthenticatedForCase(testCaseID)).To(Equal(expected))
 		},
 		Entry("same case", caseID, false, true),
