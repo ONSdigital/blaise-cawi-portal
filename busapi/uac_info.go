@@ -8,5 +8,5 @@ type UacInfo struct {
 
 func (uacInfo *UacInfo) InvalidCase() bool {
 	return uacInfo.InstrumentName == "" || uacInfo.CaseID == "" ||
-		uacInfo.InstrumentName == "unknown" || uacInfo.CaseID == "unknown"
+		uacInfo.InstrumentName == "unknown" || uacInfo.CaseID == "unknown" || uacInfo.Disabled
 }
