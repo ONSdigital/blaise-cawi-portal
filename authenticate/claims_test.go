@@ -1,7 +1,6 @@
 package authenticate_test
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
@@ -53,7 +52,6 @@ var _ = Describe("Claims", func() {
 
 	DescribeTable("AuthenticateForCase",
 		func(testCaseID string, disabled, expected bool) {
-        fmt.Println("Disabled:", disabled)
 				claim.Disabled = disabled
 			Expect(claim.AuthenticatedForCase(testCaseID)).To(Equal(expected))
 		},
