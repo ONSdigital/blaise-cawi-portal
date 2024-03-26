@@ -1,6 +1,6 @@
 module github.com/ONSdigital/blaise-cawi-portal
 
-go 1.19
+go 1.22
 
 require (
 	github.com/blendle/zapdriver v1.3.1
