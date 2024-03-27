@@ -1,5 +1,5 @@
 service: cawi-portal
-runtime: go119
+runtime: go122
 
 env_variables:
   BLAISE_REST_API: _BLAISE_REST_API
