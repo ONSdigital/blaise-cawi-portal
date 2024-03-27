@@ -16,8 +16,9 @@ vpc_access_connector:
   name: projects/_PROJECT_ID/locations/europe-west2/connectors/vpcconnect
 
 automatic_scaling:
-  max_instances: 25
-  min_instances: 1
+  min_instances: _MIN_INSTANCES
+  max_instances: _MAX_INSTANCES
+  target_cpu_utilization: _TARGET_CPU_UTILIZATION
   max_concurrent_requests: 40
 
 instance_class: F2
