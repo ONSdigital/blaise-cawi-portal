@@ -38,7 +38,8 @@ var (
 	}
 )
 
-//Generate mocks by running "go generate ./..."
+// Generate mocks by running "go generate ./..."
+//
 //go:generate mockery --name AuthInterface
 type AuthInterface interface {
 	AuthenticatedWithUac(*gin.Context)
@@ -116,6 +117,18 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
+
+	if uacInfo.Disabled {
+		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
+			zap.String("Reason", "Access code disabled"),
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseID", uacInfo.CaseID),
+		)...)
+		fmt.Println("Value of uacInfo.Disabled:", uacInfo.Disabled) //print to console
+		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
+		return
+	}
+
 	if err != nil || uacInfo.InvalidCase() {
 		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Access code not recognised"),
@@ -177,12 +190,12 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-    auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s",
-    uacInfo.InstrumentName),
-	    append(utils.GetRequestSource(context),
+	auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s",
+		uacInfo.InstrumentName),
+		append(utils.GetRequestSource(context),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
 			zap.String("CaseID", uacInfo.CaseID),
-			)...)
+		)...)
 
 	context.Redirect(http.StatusFound, fmt.Sprintf("/%s/", uacInfo.InstrumentName))
 	context.Abort()
