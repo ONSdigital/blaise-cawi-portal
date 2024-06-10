@@ -118,17 +118,6 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
 
-	fmt.Println("Value of uacInfo.Disabled:", uacInfo.Disabled) //print to console
-	if uacInfo.Disabled {
-		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
-			zap.String("Reason", "Access code disabled"),
-			zap.String("InstrumentName", uacInfo.InstrumentName),
-			zap.String("CaseID", uacInfo.CaseID),
-		)...)
-		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
-		return
-	}
-
 	if err != nil || uacInfo.InvalidCase() {
 		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Access code not recognised"),
@@ -136,9 +125,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 			zap.String("CaseID", uacInfo.CaseID),
 			zap.Error(err),
 		)...)
-		// my line
-		fmt.Println("error", err)
-		fmt.Println("uac invalid case", uacInfo.InvalidCase())
+
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(NOT_RECOGNISED_ERR, context))
 		return
 	}
@@ -192,6 +179,11 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
 		return
 	}
+
+	fmt.Println("IS SUCCESSFUL LOOK FROM HERE")
+	fmt.Println("UAC INFO HERE")
+	fmt.Println(uacInfo)
+	fmt.Println("END")
 
 	auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s",
 		uacInfo.InstrumentName),

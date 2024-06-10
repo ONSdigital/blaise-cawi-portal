@@ -105,6 +105,7 @@ set ENCRYPTION_SECRET=00000000000000000000000000000000
 set PORT=8080
 set BLAISE_REST_API=http://localhost:90
 ```
+Not working? Try running BUS_URL and CATI_URL without the ""
 
 Run application:
 
