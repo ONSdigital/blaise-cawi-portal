@@ -180,11 +180,6 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	fmt.Println("IS SUCCESSFUL LOOK FROM HERE")
-	fmt.Println("UAC INFO HERE")
-	fmt.Println(uacInfo)
-	fmt.Println("END")
-
 	auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s",
 		uacInfo.InstrumentName),
 		append(utils.GetRequestSource(context),
