@@ -180,12 +180,17 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	//TESTING
-	// auth.Logger.Info("Successful auth with questionnaire: ",
-	// 	append(utils.GetRequestSource(context),
-	// 		zap.String("InstrumentName", uacInfo.InstrumentName),
-	// 		zap.String("CaseID", uacInfo.CaseID),
-	// 	)...)
+	instrumentName := strings.ReplaceAll(uacInfo.InstrumentName, "\n", "")
+	instrumentName = strings.ReplaceAll(instrumentName, "\r", "")
+
+	caseID := strings.ReplaceAll(uacInfo.CaseID, "\n", "")
+	caseID = strings.ReplaceAll(caseID, "\r", "")
+
+	auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s", instrumentName),
+		append(utils.GetRequestSource(context),
+			zap.String("InstrumentName", instrumentName),
+			zap.String("CaseID", caseID),
+		)...)
 
 	context.Redirect(http.StatusFound, fmt.Sprintf("/%s/", uacInfo.InstrumentName))
 	context.Abort()
