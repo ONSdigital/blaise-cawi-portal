@@ -180,11 +180,10 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s",
-		uacInfo.InstrumentName),
+	auth.Logger.Info("Successful auth with questionnaire: ",
 		append(utils.GetRequestSource(context),
-			zap.String("InstrumentName", "TEST VALUE DO NOT MERGEuacInfo.InstrumentName"),
-			zap.String("CaseID", "TEST VALUE DO NOT MERGEuacInfo.CaseID"),
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseID", uacInfo.CaseID),
 		)...)
 
 	context.Redirect(http.StatusFound, fmt.Sprintf("/%s/", uacInfo.InstrumentName))
