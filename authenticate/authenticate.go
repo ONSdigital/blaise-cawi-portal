@@ -38,7 +38,8 @@ var (
 	}
 )
 
-//Generate mocks by running "go generate ./..."
+// Generate mocks by running "go generate ./..."
+//
 //go:generate mockery --name AuthInterface
 type AuthInterface interface {
 	AuthenticatedWithUac(*gin.Context)
@@ -116,6 +117,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 
 	uacInfo, err := auth.BusApi.GetUacInfo(uac)
+
 	if err != nil || uacInfo.InvalidCase() {
 		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Access code not recognised"),
@@ -123,6 +125,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 			zap.String("CaseID", uacInfo.CaseID),
 			zap.Error(err),
 		)...)
+
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(NOT_RECOGNISED_ERR, context))
 		return
 	}
@@ -177,12 +180,17 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-    auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s",
-    uacInfo.InstrumentName),
-	    append(utils.GetRequestSource(context),
-			zap.String("InstrumentName", uacInfo.InstrumentName),
-			zap.String("CaseID", uacInfo.CaseID),
-			)...)
+	instrumentName := strings.ReplaceAll(uacInfo.InstrumentName, "\n", "")
+	instrumentName = strings.ReplaceAll(instrumentName, "\r", "")
+
+	caseID := strings.ReplaceAll(uacInfo.CaseID, "\n", "")
+	caseID = strings.ReplaceAll(caseID, "\r", "")
+
+	auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s", instrumentName),
+		append(utils.GetRequestSource(context),
+			zap.String("InstrumentName", instrumentName),
+			zap.String("CaseID", caseID),
+		)...)
 
 	context.Redirect(http.StatusFound, fmt.Sprintf("/%s/", uacInfo.InstrumentName))
 	context.Abort()

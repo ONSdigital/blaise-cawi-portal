@@ -623,6 +623,7 @@ var _ = Describe("Has Session", func() {
 		httpRouter     *gin.Engine
 		instrumentName = "foobar"
 		caseID         = "fizzbuzz"
+		disabled       = false
 	)
 
 	BeforeEach(func() {
@@ -672,6 +673,7 @@ var _ = Describe("Has Session", func() {
 				UacInfo: busapi.UacInfo{
 					InstrumentName: instrumentName,
 					CaseID:         caseID,
+					Disabled:       disabled,
 				},
 			}, nil)
 		})
@@ -680,7 +682,66 @@ var _ = Describe("Has Session", func() {
 			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
 			body := httpRecorder.Body.Bytes()
 			Expect(string(body)).To(Equal(
-				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz"}}`,
+				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":false}}`,
+			))
+		})
+	})
+
+	Context("When a UAC is disabled", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
+				UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+					Disabled:       true,
+				},
+			}, nil)
+		})
+
+		It("it returns `disabled:true` in the response", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(string(body)).To(Equal(
+				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":true}}`,
+			))
+		})
+	})
+
+	Context("When a UAC is enabled", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
+				UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+					Disabled:       false,
+				},
+			}, nil)
+		})
+
+		It("it returns `disabled:false` in the response", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(string(body)).To(Equal(
+				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":false}}`,
+			))
+		})
+	})
+
+	Context("When a UAC Disabled field is unset", func() {
+		BeforeEach(func() {
+			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
+				UacInfo: busapi.UacInfo{
+					InstrumentName: instrumentName,
+					CaseID:         caseID,
+				},
+			}, nil)
+		})
+
+		It("it returns `disabled:false` in the response", func() {
+			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+			body := httpRecorder.Body.Bytes()
+			Expect(string(body)).To(Equal(
+				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":false}}`,
 			))
 		})
 	})
