@@ -15,12 +15,14 @@ var _ = Describe("Claims", func() {
 	var (
 		instrumentName = "foo"
 		caseID         = "bar"
+		disabled       = false
 		claim          = &authenticate.UACClaims{
 			UAC:         "0008901",
 			AuthTimeout: 15,
 			UacInfo: busapi.UacInfo{
 				InstrumentName: instrumentName,
 				CaseID:         caseID,
+				Disabled:       disabled,
 			},
 		}
 	)
@@ -49,12 +51,14 @@ var _ = Describe("Claims", func() {
 	)
 
 	DescribeTable("AuthenticateForCase",
-		func(testCaseID string, expected bool) {
+		func(testCaseID string, disabled, expected bool) {
+				claim.Disabled = disabled
 			Expect(claim.AuthenticatedForCase(testCaseID)).To(Equal(expected))
 		},
-		Entry("same case", caseID, true),
-		Entry("different case", strings.ToUpper(caseID), true),
-		Entry("not matching", "bacon", false),
+		Entry("same case", caseID, false, true),
+		Entry("different case", strings.ToUpper(caseID), false, true),
+		Entry("not matching", "bacon", false, false),
+		Entry("is not authenticated when UAC is disabled", caseID, true, false),
 	)
 
 	Describe("LogFields", func() {
