@@ -7,7 +7,7 @@
 [![GitHub contributors](https://img.shields.io/github/contributors/ONSdigital/blaise-cawi-portal.svg)](https://github.com/ONSdigital/blaise-cawi-portal/graphs/contributors)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/ONSdigital/blaise-cawi-portal.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ONSdigital/blaise-cawi-portal/alerts/)
 
-Web-based user interface for respondents to access their Blaise questionnaire via a Unique Access Code (UAC).
+Web-based user interface for respondents to access their Blaise questionnaire via a Unique Access Code (UAC). 
 
 Records of a respondents questionnaire/instrument name, case serial number, and UAC are stored in the GCP NoSQL database Datastore. When a respondent enters their UAC we refer to Datastore to get their questionnaire/instrument name and case serial number, these are then passed to Blaise so the appropriate questionnaire/instrument and case are opened for the respondent.
 
@@ -105,6 +105,7 @@ set ENCRYPTION_SECRET=00000000000000000000000000000000
 set PORT=8080
 set BLAISE_REST_API=http://localhost:90
 ```
+Not working? Try running BUS_URL and CATI_URL without the ""
 
 Run application:
 
