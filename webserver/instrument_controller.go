@@ -10,6 +10,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"unicode"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
@@ -48,6 +49,15 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 	httpRouter.GET("/:instrumentName/logout", instrumentController.logoutEndpoint)
 }
 
+func sanitizeLogInput(input string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == '\t' || !unicode.IsPrint(r) {
+			return -1 // Removes the character
+		}
+		return r
+	}, input)
+}
+
 func (instrumentController *InstrumentController) instrumentAuth(context *gin.Context) (*authenticate.UACClaims, error) {
 	session := sessions.DefaultMany(context, "user_session")
 	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
@@ -60,7 +70,7 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 	instrumentName := context.Param("instrumentName")
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
 		instrumentController.Logger.Info("Not authenticated for instrument",
-			append(uacClaim.LogFields(), zap.String("InstrumentName", instrumentName))...)
+			append(uacClaim.LogFields(), zap.String("InstrumentName", sanitizeLogInput(instrumentName)))...)
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return nil, fmt.Errorf("Forbidden")
 	}
@@ -105,23 +115,22 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 		return
 	}
 
-
-    if getContentType(resp) == "text/html" {
-        var buf bytes.Buffer
-        injectedBody, err := InjectScript(body)
-        if err == nil {
-            err = html.Render(&buf, injectedBody)
-            if err == nil {
-                body = buf.Bytes()
-            } else {
-                instrumentController.Logger.Error("Error rendering HTML",
-                    append(uacClaim.LogFields(), zap.Error(err))...)
-            }
-        } else {
-            instrumentController.Logger.Error("Error injecting check-session script",
-                append(uacClaim.LogFields(), zap.Error(err))...)
-        }
-    }
+	if getContentType(resp) == "text/html" {
+		var buf bytes.Buffer
+		injectedBody, err := InjectScript(body)
+		if err == nil {
+			err = html.Render(&buf, injectedBody)
+			if err == nil {
+				body = buf.Bytes()
+			} else {
+				instrumentController.Logger.Error("Error rendering HTML",
+					append(uacClaim.LogFields(), zap.Error(err))...)
+			}
+		} else {
+			instrumentController.Logger.Error("Error injecting check-session script",
+				append(uacClaim.LogFields(), zap.Error(err))...)
+		}
+	}
 
 	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
 }
@@ -163,7 +172,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
 		instrumentController.Logger.Info("Not authenticated to start interview for case",
-			append(uacClaim.LogFields(), zap.String("CaseID", sanitizeInput(startInterview.RuntimeParameters.KeyValue)))...)
+			append(uacClaim.LogFields(), zap.String("CaseID", sanitizeLogInput(startInterview.RuntimeParameters.KeyValue)))...)
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
@@ -187,7 +196,6 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 
 	proxy.ServeHTTP(context.Writer, context.Request)
 }
-
 
 func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Context) {
 	session := sessions.DefaultMany(context, "user_session")
