@@ -51,13 +51,15 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 
 func sanitizeLogInput(input string) string {
 	escapedInput := html.EscapeString(input)
+	escapedInput = strings.ReplaceAll(escapedInput, "\n", "")
+	escapedInput = strings.ReplaceAll(escapedInput, "\r", "")
+	escapedInput = strings.ReplaceAll(escapedInput, "\t", "")
 	return strings.Map(func(r rune) rune {
-		if r == '\n' || r == '\r' || r == '\t' || !unicode.IsPrint(r) {
+		if !unicode.IsPrint(r) {
 			return -1
 		}
 		return r
 	}, escapedInput)
-
 }
 
 func (instrumentController *InstrumentController) instrumentAuth(context *gin.Context) (*authenticate.UACClaims, error) {
