@@ -68,9 +68,10 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 		return nil, err
 	}
 	instrumentName := context.Param("instrumentName")
+	sanitizedInstrumentName := sanitizeLogInput(instrumentName)
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
 		instrumentController.Logger.Info("Not authenticated for instrument",
-			append(uacClaim.LogFields(), zap.String("InstrumentName", sanitizeLogInput(instrumentName)))...)
+			append(uacClaim.LogFields(), zap.String("InstrumentName", sanitizedInstrumentName))...)
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return nil, fmt.Errorf("Forbidden")
 	}
@@ -171,8 +172,9 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	}
 
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
+		sanitizedCaseID := sanitizeLogInput(startInterview.RuntimeParameters.KeyValue)
 		instrumentController.Logger.Info("Not authenticated to start interview for case",
-			append(uacClaim.LogFields(), zap.String("CaseID", sanitizeLogInput(startInterview.RuntimeParameters.KeyValue)))...)
+			append(uacClaim.LogFields(), zap.String("CaseID", sanitizedCaseID))...)
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
