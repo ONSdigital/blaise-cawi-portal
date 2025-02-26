@@ -163,7 +163,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
 		instrumentController.Logger.Info("Not authenticated to start interview for case",
-			append(uacClaim.LogFields(), zap.String("CaseID", startInterview.RuntimeParameters.KeyValue))...)
+			append(uacClaim.LogFields(), zap.String("CaseID", sanitizeInput(startInterview.RuntimeParameters.KeyValue)))...)
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
@@ -187,6 +187,7 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 
 	proxy.ServeHTTP(context.Writer, context.Request)
 }
+
 
 func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Context) {
 	session := sessions.DefaultMany(context, "user_session")
