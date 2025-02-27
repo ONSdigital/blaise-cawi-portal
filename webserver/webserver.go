@@ -215,7 +215,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.Use(sessions.SessionsManyStores(sessionStores))
 
 	//This router has access to all templates in the templates folder
-	httpRouter.TrustedPlatform = gin.PlatformGoogleAppEngine // CodeQL: ignore [go/hardcoded-credentials]
+	httpRouter.TrustedPlatform = gin.PlatformGoogleAppEngine
 	httpRouter.SetFuncMap(template.FuncMap{
 		"WrapWelsh": WrapWelsh,
 	})
