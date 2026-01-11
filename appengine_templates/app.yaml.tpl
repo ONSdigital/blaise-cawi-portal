@@ -13,7 +13,7 @@ env_variables:
   GIN_MODE: release
 
 vpc_access_connector:
-  name: projects/_PROJECT_ID/locations/europe-west2/connectors/vpcconnect
+  name: _VPC_CONNECTOR
 
 automatic_scaling:
   min_instances: _MIN_INSTANCES
