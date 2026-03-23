@@ -72,6 +72,7 @@ Download a service account JSON key:
 gcloud iam service-accounts keys create keys.json --iam-account ons-blaise-v2-dev-sandbox123@appspot.gserviceaccount.com
 ```
 
+Grab the value of BUS_CLIENT_ID from config of CAWI portal service in Google Console (App Engine - Services view) 
 Run the following commands to set the necessary environment variables locally:
 
 Unix:
@@ -80,8 +81,7 @@ Unix:
 export BLAISE_ENV=dev-sandbox123
 export DEV_MODE=true
 export GOOGLE_APPLICATION_CREDENTIALS=keys.json
-export OAUTH_NAME=$(gcloud alpha iap oauth-brands list --format=json | jq -r '.[] | select(.applicationTitle == "blaise").name')
-export BUS_CLIENT_ID=$(gcloud alpha iap oauth-clients list "${OAUTH_NAME}" --format=json | jq -r '.[] | select(.displayName == "bus").name' | awk -F/ '{print $NF}')
+export BUS_CLIENT_ID=<value taken from Config of CAWI portal in GCP console - as mentioned above>
 export BUS_URL="https://${BLAISE_ENV}-bus.social-surveys.gcp.onsdigital.uk"
 export CATI_URL="https://${BLAISE_ENV}-cati.social-surveys.gcp.onsdigital.uk"
 export JWT_SECRET=00000000000000000000000000000000
