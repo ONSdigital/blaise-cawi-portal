@@ -70,7 +70,7 @@ gcloud compute start-iap-tunnel restapi-1 80 --local-host-port=localhost:90 --zo
 Download a service account JSON key:
 ```
 gcloud iam service-accounts keys create keys.json --iam-account ons-blaise-v2-dev-sandbox123@appspot.gserviceaccount.com
-```
+``` 
 
 Run the following commands to set the necessary environment variables locally:
 
@@ -80,8 +80,7 @@ Unix:
 export BLAISE_ENV=dev-sandbox123
 export DEV_MODE=true
 export GOOGLE_APPLICATION_CREDENTIALS=keys.json
-export OAUTH_NAME=$(gcloud alpha iap oauth-brands list --format=json | jq -r '.[] | select(.applicationTitle == "blaise").name')
-export BUS_CLIENT_ID=$(gcloud alpha iap oauth-clients list "${OAUTH_NAME}" --format=json | jq -r '.[] | select(.displayName == "bus").name' | awk -F/ '{print $NF}')
+export BUS_CLIENT_ID=$(gcloud app versions describe $(gcloud app versions list --service="cawi-portal" --sort-by="~version.createTime" --limit=1 --format="value(id)") --service="cawi-portal" --format="value(envVariables.BUS_CLIENT_ID)")
 export BUS_URL="https://${BLAISE_ENV}-bus.social-surveys.gcp.onsdigital.uk"
 export CATI_URL="https://${BLAISE_ENV}-cati.social-surveys.gcp.onsdigital.uk"
 export JWT_SECRET=00000000000000000000000000000000
