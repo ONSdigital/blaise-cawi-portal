@@ -7,7 +7,7 @@ require (
 	github.com/gin-contrib/secure v0.0.1
 	github.com/gin-contrib/sessions v0.0.4
 	github.com/gin-gonic/gin v1.10.0
-	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/jarcoal/httpmock v1.0.8
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.4
