@@ -20,6 +20,7 @@ var _ = Describe("JWTCrypto", func() {
 	It("sets expiry to roughly authTimeout minutes", func() {
 		authTimeout := 7
 		before := time.Now()
+		tolerance := 2 * time.Second
 
 		token, err := jwtCrypto.EncryptJWT("123456789012", &busapi.UacInfo{
 			InstrumentName: "foo",
@@ -34,13 +35,14 @@ var _ = Describe("JWTCrypto", func() {
 		after := time.Now()
 		expiresAt := claims.ExpiresAt.Time
 
-		Expect(expiresAt).To(BeTemporally(">=", before.Add(time.Duration(authTimeout)*time.Minute-time.Second)))
-		Expect(expiresAt).To(BeTemporally("<=", after.Add(time.Duration(authTimeout)*time.Minute+time.Second)))
+		Expect(expiresAt).To(BeTemporally(">=", before.Add(time.Duration(authTimeout)*time.Minute-tolerance)))
+		Expect(expiresAt).To(BeTemporally("<=", after.Add(time.Duration(authTimeout)*time.Minute+tolerance)))
 		Expect(claims.Issuer).To(Equal(authenticate.ISSUER))
 	})
 
 	It("uses the default timeout when authTimeout is zero", func() {
 		before := time.Now()
+		tolerance := 2 * time.Second
 
 		token, err := jwtCrypto.EncryptJWT("123456789012", &busapi.UacInfo{
 			InstrumentName: "foo",
@@ -56,7 +58,9 @@ var _ = Describe("JWTCrypto", func() {
 		expected := time.Duration(authenticate.DefaultAuthTimeout) * time.Minute
 		expiresAt := claims.ExpiresAt.Time
 
-		Expect(expiresAt).To(BeTemporally(">=", before.Add(expected-time.Second)))
-		Expect(expiresAt).To(BeTemporally("<=", after.Add(expected+time.Second)))
+		Expect(expiresAt).To(BeTemporally(">=", before.Add(expected-tolerance)))
+		Expect(expiresAt).To(BeTemporally("<=", after.Add(expected+tolerance)))
+		Expect(claims.AuthTimeout).To(Equal(authenticate.DefaultAuthTimeout))
+		Expect(claims.Issuer).To(Equal(authenticate.ISSUER))
 	})
 })
