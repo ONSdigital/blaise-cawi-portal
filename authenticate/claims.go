@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 )
 
@@ -14,7 +14,7 @@ type UACClaims struct {
 	UAC         string `json:"uac"`
 	AuthTimeout int    `json:"auth_timeout"`
 	busapi.UacInfo
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 func (uacClaims *UACClaims) AuthenticatedForInstrument(instrumentName string) bool {
