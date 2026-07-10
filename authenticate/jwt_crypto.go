@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 //Generate mocks by running "go generate ./..."
@@ -33,8 +33,8 @@ func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UacInfo, auth
 			InstrumentName: uacInfo.InstrumentName,
 			CaseID:         uacInfo.CaseID,
 		},
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Unix() + expirationSeconds(authTimeout),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(authTimeout) * time.Minute)),
 			Issuer:    ISSUER,
 		},
 	}
@@ -48,19 +48,18 @@ func (jwtCrypto *JWTCrypto) DecryptJWT(jwtToken interface{}) (*UACClaims, error)
 		return nil, fmt.Errorf("no JWT Token in session")
 	}
 	token, err := jwt.ParseWithClaims(jwtToken.(string), &UACClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
 		return []byte(jwtCrypto.JWTSecret), nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	if err := token.Claims.Valid(); err != nil {
-		return nil, err
+	claims, ok := token.Claims.(*UACClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid token claims")
 	}
 
-	return token.Claims.(*UACClaims), nil
-}
-
-func expirationSeconds(sessionTimeout int) int64 {
-	sessionMinutes := time.Duration(sessionTimeout) * time.Minute
-	return int64(sessionMinutes.Seconds())
+	return claims, nil
 }
