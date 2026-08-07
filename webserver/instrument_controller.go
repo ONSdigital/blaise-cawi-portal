@@ -22,9 +22,9 @@ import (
 )
 
 // TODO(Blaise 5.16 upgrade): remove support for the legacy default.aspx launch route.
-// Once all questionnaires use the new layout structure, this can be reduced to just
-// "Views/Shared/_Layout.cshtml" and the fallback-specific code in launchCase can be removed.
-var launchPaths = []string{"default.aspx", "Views/Shared/_Layout.cshtml"}
+// In newer Blaise questionnaires, default.aspx is removed and the launch request should
+// hit the instrument root URL (served via MVC views such as _Layout.cshtml).
+var launchPaths = []string{"default.aspx", ""}
 
 type InstrumentController struct {
 	Auth            authenticate.AuthInterface
@@ -146,8 +146,13 @@ func (instrumentController *InstrumentController) launchCase(context *gin.Contex
 	form := blaise.CasePayload(uacClaim.UacInfo.CaseID, instrumentController.LanguageManager.IsWelsh(context)).Form()
 
 	for i, path := range launchPaths {
+		launchURL := fmt.Sprintf("%s/%s/", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName)
+		if path != "" {
+			launchURL = fmt.Sprintf("%s/%s/%s", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path)
+		}
+
 		resp, err := http.PostForm(
-			fmt.Sprintf("%s/%s/%s", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path),
+			launchURL,
 			form,
 		)
 		if err != nil {

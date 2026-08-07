@@ -128,7 +128,7 @@ var _ = Describe("Open Case", func() {
 				})
 			})
 
-			Context("and legacy default.aspx is missing so it falls back to layout path", func() {
+			Context("and legacy default.aspx is missing so it falls back to instrument root", func() {
 				JustBeforeEach(func() {
 					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 
@@ -143,7 +143,7 @@ var _ = Describe("Open Case", func() {
 					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
 						httpmock.NewStringResponder(http.StatusNotFound, "not found"))
 
-					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/Views/Shared/_Layout.cshtml", catiUrl, instrumentName),
+					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/", catiUrl, instrumentName),
 						httpmock.ResponderFromResponse(mockResponse))
 
 					mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
