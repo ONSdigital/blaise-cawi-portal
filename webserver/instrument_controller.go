@@ -21,6 +21,11 @@ import (
 	"golang.org/x/net/html"
 )
 
+// TODO(Blaise 5.16 upgrade): remove support for the legacy default.aspx launch route.
+// Once all questionnaires use the new layout structure, this can be reduced to just
+// "Views/Shared/_Layout.cshtml" and the fallback-specific code in launchCase can be removed.
+var launchPaths = []string{"default.aspx", "Views/Shared/_Layout.cshtml"}
+
 type InstrumentController struct {
 	Auth            authenticate.AuthInterface
 	JWTCrypto       authenticate.JWTCryptoInterface
@@ -90,10 +95,7 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 	if err != nil {
 		return
 	}
-	resp, err := http.PostForm(
-		fmt.Sprintf("%s/%s/default.aspx", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName),
-		blaise.CasePayload(uacClaim.UacInfo.CaseID, instrumentController.LanguageManager.IsWelsh(context)).Form(),
-	)
+	resp, err := instrumentController.launchCase(context, uacClaim)
 	if err != nil {
 		instrumentController.Logger.Error("Error launching blaise study", append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
@@ -138,6 +140,30 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 	}
 
 	context.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
+}
+
+func (instrumentController *InstrumentController) launchCase(context *gin.Context, uacClaim *authenticate.UACClaims) (*http.Response, error) {
+	form := blaise.CasePayload(uacClaim.UacInfo.CaseID, instrumentController.LanguageManager.IsWelsh(context)).Form()
+
+	for i, path := range launchPaths {
+		resp, err := http.PostForm(
+			fmt.Sprintf("%s/%s/%s", instrumentController.CatiUrl, uacClaim.UacInfo.InstrumentName, path),
+			form,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO(Blaise 5.16 upgrade): delete this 404 fallback branch when default.aspx is retired.
+		if resp.StatusCode == http.StatusNotFound && i < len(launchPaths)-1 {
+			resp.Body.Close()
+			continue
+		}
+
+		return resp, nil
+	}
+
+	return nil, fmt.Errorf("failed to launch case for instrument %s", uacClaim.UacInfo.InstrumentName)
 }
 
 func (instrumentController *InstrumentController) proxyWithInstrumentAuth(context *gin.Context) {

@@ -127,6 +127,41 @@ var _ = Describe("Open Case", func() {
 					Expect(httpRecorder.Body.String()).To(Equal(`<html><head></head><body><script src="/assets/js/check-session.js"></script></body></html>`))
 				})
 			})
+
+			Context("and legacy default.aspx is missing so it falls back to layout path", func() {
+				JustBeforeEach(func() {
+					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+
+					mockResponse := &http.Response{
+						StatusCode: 200,
+						Header: http.Header{
+							"Content-Type": {"text/html"},
+						},
+						Body: io.NopCloser(strings.NewReader(responseInfo)),
+					}
+
+					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", catiUrl, instrumentName),
+						httpmock.NewStringResponder(http.StatusNotFound, "not found"))
+
+					httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/Views/Shared/_Layout.cshtml", catiUrl, instrumentName),
+						httpmock.ResponderFromResponse(mockResponse))
+
+					mockAuth.On("AuthenticatedWithUac", mock.Anything).Return()
+					mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{UacInfo: busapi.UacInfo{
+						InstrumentName: instrumentName,
+						CaseID:         caseID,
+					}}, nil)
+
+					httpRecorder = CreateTestResponseRecorder()
+					req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/", instrumentName), nil)
+					httpRouter.ServeHTTP(httpRecorder, req)
+				})
+
+				It("Returns a 200 response and some data, with an injected check-session script", func() {
+					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
+					Expect(httpRecorder.Body.String()).To(Equal(`<html><head></head><body><script src="/assets/js/check-session.js"></script></body></html>`))
+				})
+			})
 		})
 
 		Context("Launching Blaise in Cawi mode for a different instrument", func() {
