@@ -63,12 +63,12 @@ func newInstrumentHarness(t *testing.T) *instrumentHarness {
 	t.Helper()
 
 	h := &instrumentHarness{
-		catiURL:        "http://localhost",
-		instrumentName: "foobar",
-		caseID:         "fizzbuzz",
-		responseInfo:   "<html><head></head><body></body></html>",
-		mockAuth:       &mocks.AuthInterface{},
-		mockJWTCrypto:  &mocks.JWTCryptoInterface{},
+		catiURL:             "http://localhost",
+		instrumentName:      "foobar",
+		caseID:              "fizzbuzz",
+		responseInfo:        "<html><head></head><body></body></html>",
+		mockAuth:            &mocks.AuthInterface{},
+		mockJWTCrypto:       &mocks.JWTCryptoInterface{},
 		languageManagerMock: &languageManagerMocks.LanguageManagerInterface{},
 	}
 

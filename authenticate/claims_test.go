@@ -76,10 +76,10 @@ func TestAuthenticatedForCase(t *testing.T) {
 	caseID := claim.CaseID
 
 	tests := []struct {
-		name      string
+		name       string
 		testCaseID string
-		disabled  bool
-		expected  bool
+		disabled   bool
+		expected   bool
 	}{
 		{name: "same case", testCaseID: caseID, disabled: false, expected: true},
 		{name: "different case", testCaseID: strings.ToUpper(caseID), disabled: false, expected: true},

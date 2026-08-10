@@ -204,7 +204,7 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 
 	if !uacClaim.AuthenticatedForCase(startInterview.RuntimeParameters.KeyValue) {
 		instrumentController.logger().Info("Not authenticated to start interview for case",
-				append(uacClaim.LogFields(), zap.String("CaseIDFingerprint", authenticate.CaseIDFingerprint(startInterview.RuntimeParameters.KeyValue)))...)
+			append(uacClaim.LogFields(), zap.String("CaseIDFingerprint", authenticate.CaseIDFingerprint(startInterview.RuntimeParameters.KeyValue)))...)
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
 		return true
 	}
