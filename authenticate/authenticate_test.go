@@ -10,13 +10,14 @@ import (
 	"testing"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
-	mockauth "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
+	authmocks "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
-	mockrestapi "github.com/ONSdigital/blaise-cawi-portal/blaiserestapi/mocks"
+	restapimocks "github.com/ONSdigital/blaise-cawi-portal/blaiserestapi/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
-	"github.com/ONSdigital/blaise-cawi-portal/busapi/mocks"
+	busmocks "github.com/ONSdigital/blaise-cawi-portal/busapi/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/csrf"
-	languageManagerMocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
+	languagemocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -34,7 +35,7 @@ type loginHarness struct {
 	router         *gin.Engine
 	session        sessions.Session
 	logs           *observer.ObservedLogs
-	languageMock   *languageManagerMocks.LanguageManagerInterface
+	languageMock   *languagemocks.LanguageManagerInterface
 	csrfManager    *csrf.DefaultCSRFManager
 	jwtCrypto      *authenticate.JWTCrypto
 	observedLogger *zap.Logger
@@ -47,13 +48,13 @@ func newLoginHarness(t *testing.T, welsh bool) *loginHarness {
 	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
 	observedLogger := zap.New(observedZapCore)
 
-	languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+	languageManagerMock := &languagemocks.LanguageManagerInterface{}
 	languageManagerMock.On("IsWelsh", mock.Anything).Return(welsh)
 	languageManagerMock.On("LanguageError", authenticate.NOT_RECOGNISED_ERR, mock.Anything).Return("Access code not recognised. Enter the code again")
 	languageManagerMock.On("LanguageError", authenticate.INTERNAL_SERVER_ERR, mock.Anything).Return("We were unable to process your request, please try again")
 
 	jwtCrypto := &authenticate.JWTCrypto{JWTSecret: "hello"}
-	csrfManager := &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"}
+	csrfManager := &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: sessionkeys.SessionName}
 	auth := &authenticate.Auth{
 		JWTCrypto:       jwtCrypto,
 		Logger:          observedLogger,
@@ -65,7 +66,7 @@ func newLoginHarness(t *testing.T, welsh bool) *loginHarness {
 	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
 	router.LoadHTMLGlob("../templates/*")
 	store := cookie.NewStore([]byte("secret"))
-	router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+	router.Use(sessions.SessionsMany([]string{sessionkeys.SessionName, sessionkeys.UserSessionName, sessionkeys.SessionValidationName, sessionkeys.LanguageSessionName}, store))
 
 	h := &loginHarness{
 		auth:           auth,
@@ -78,7 +79,7 @@ func newLoginHarness(t *testing.T, welsh bool) *loginHarness {
 	}
 
 	router.POST("/login", func(c *gin.Context) {
-		h.session = sessions.DefaultMany(c, "user_session")
+		h.session = sessions.DefaultMany(c, sessionkeys.UserSessionName)
 		h.auth.Login(c, h.session)
 	})
 
@@ -115,12 +116,12 @@ func TestLogin(t *testing.T) {
 		h := newLoginHarness(t, false)
 		h.auth.UACKind = "uac"
 
-		mockBusAPI := &mocks.BUSAPIInterface{}
-		mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+		mockBusAPI := &busmocks.BUSAPIInterface{}
+		mockBusAPI.On("GetUACInfo", mock.Anything, validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
 		h.auth.BUSAPI = mockBusAPI
 
-		mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
-		mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, blaiserestapi.InstrumentNotFoundError)
+		mockRestAPI := &restapimocks.BlaiseRestAPIInterface{}
+		mockRestAPI.On("GetInstrumentSettings", mock.Anything, mock.Anything).Return(blaiserestapi.InstrumentSettings{}, blaiserestapi.InstrumentNotFoundError)
 		h.auth.BlaiseRestAPI = mockRestAPI
 
 		recorder := h.postLogin(t, validUAC, "")
@@ -145,12 +146,12 @@ func TestLogin(t *testing.T) {
 			h := newLoginHarness(t, false)
 			h.auth.UACKind = "uac"
 
-			mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
-			mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+			mockRestAPI := &restapimocks.BlaiseRestAPIInterface{}
+			mockRestAPI.On("GetInstrumentSettings", mock.Anything, mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
 			h.auth.BlaiseRestAPI = mockRestAPI
 
-			mockBusAPI := &mocks.BUSAPIInterface{}
-			mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{InstrumentName: "", CaseID: "bar"}, nil)
+			mockBusAPI := &busmocks.BUSAPIInterface{}
+			mockBusAPI.On("GetUACInfo", mock.Anything, validUAC).Once().Return(busapi.UACInfo{InstrumentName: "", CaseID: "bar"}, nil)
 			h.auth.BUSAPI = mockBusAPI
 
 			recorder := h.postLogin(t, validUAC, "1.1.1.1")
@@ -174,8 +175,8 @@ func TestLogin(t *testing.T) {
 			h := newLoginHarness(t, false)
 			h.auth.UACKind = "uac"
 
-			mockBusAPI := &mocks.BUSAPIInterface{}
-			mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{}, fmt.Errorf("bus unavailable"))
+			mockBusAPI := &busmocks.BUSAPIInterface{}
+			mockBusAPI.On("GetUACInfo", mock.Anything, validUAC).Once().Return(busapi.UACInfo{}, fmt.Errorf("bus unavailable"))
 			h.auth.BUSAPI = mockBusAPI
 
 			recorder := h.postLogin(t, validUAC, "1.1.1.1")
@@ -189,8 +190,8 @@ func TestLogin(t *testing.T) {
 			assert.Equal(t, "Failed auth", entry.Message)
 			assert.Equal(t, "1.1.1.1", entry.ContextMap()["SourceIP"])
 			assert.Equal(t, "Error retrieving UAC information", entry.ContextMap()["Reason"])
-			assert.Equal(t, "", entry.ContextMap()["InstrumentName"])
-			assert.Equal(t, "unknown", entry.ContextMap()["CaseIDFingerprint"])
+			assert.Nil(t, entry.ContextMap()["InstrumentName"])
+			assert.Nil(t, entry.ContextMap()["CaseIDFingerprint"])
 			assert.Equal(t, "bus unavailable", entry.ContextMap()["error"])
 			assert.Equal(t, zap.ErrorLevel, entry.Level)
 		})
@@ -200,12 +201,12 @@ func TestLogin(t *testing.T) {
 				h := newLoginHarness(t, false)
 				h.auth.UACKind = "uac"
 
-				mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
-				mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+				mockRestAPI := &restapimocks.BlaiseRestAPIInterface{}
+				mockRestAPI.On("GetInstrumentSettings", mock.Anything, mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
 				h.auth.BlaiseRestAPI = mockRestAPI
 
-				mockBusAPI := &mocks.BUSAPIInterface{}
-				mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+				mockBusAPI := &busmocks.BUSAPIInterface{}
+				mockBusAPI.On("GetUACInfo", mock.Anything, validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
 				h.auth.BUSAPI = mockBusAPI
 
 				recorder := h.postLogin(t, validUAC, "")
@@ -226,12 +227,12 @@ func TestLogin(t *testing.T) {
 				h := newLoginHarness(t, false)
 				h.auth.UACKind = "uac16"
 
-				mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
-				mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+				mockRestAPI := &restapimocks.BlaiseRestAPIInterface{}
+				mockRestAPI.On("GetInstrumentSettings", mock.Anything, mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
 				h.auth.BlaiseRestAPI = mockRestAPI
 
-				mockBusAPI := &mocks.BUSAPIInterface{}
-				mockBusAPI.On("GetUACInfo", validUAC16).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+				mockBusAPI := &busmocks.BUSAPIInterface{}
+				mockBusAPI.On("GetUACInfo", mock.Anything, validUAC16).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
 				h.auth.BUSAPI = mockBusAPI
 
 				recorder := h.postLogin(t, validUAC16, "")
@@ -254,12 +255,12 @@ func TestLogin(t *testing.T) {
 				h := newLoginHarness(t, false)
 				h.auth.UACKind = "uac"
 
-				mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
-				mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+				mockRestAPI := &restapimocks.BlaiseRestAPIInterface{}
+				mockRestAPI.On("GetInstrumentSettings", mock.Anything, mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
 				h.auth.BlaiseRestAPI = mockRestAPI
 
-				mockBusAPI := &mocks.BUSAPIInterface{}
-				mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+				mockBusAPI := &busmocks.BUSAPIInterface{}
+				mockBusAPI.On("GetUACInfo", mock.Anything, validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
 				h.auth.BUSAPI = mockBusAPI
 
 				recorder := h.postLogin(t, spacedUAC, "")
@@ -284,12 +285,12 @@ func TestLogin(t *testing.T) {
 				h := newLoginHarness(t, false)
 				h.auth.UACKind = "uac16"
 
-				mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
-				mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+				mockRestAPI := &restapimocks.BlaiseRestAPIInterface{}
+				mockRestAPI.On("GetInstrumentSettings", mock.Anything, mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
 				h.auth.BlaiseRestAPI = mockRestAPI
 
-				mockBusAPI := &mocks.BUSAPIInterface{}
-				mockBusAPI.On("GetUACInfo", validUAC16).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+				mockBusAPI := &busmocks.BUSAPIInterface{}
+				mockBusAPI.On("GetUACInfo", mock.Anything, validUAC16).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
 				h.auth.BUSAPI = mockBusAPI
 
 				recorder := h.postLogin(t, spacedUAC16, "")
@@ -405,10 +406,10 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
-	languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+	languageManagerMock := &languagemocks.LanguageManagerInterface{}
 	languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 	auth := &authenticate.Auth{
-		CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"},
+		CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: sessionkeys.SessionName},
 		LanguageManager: languageManagerMock,
 	}
 
@@ -416,11 +417,11 @@ func TestLogout(t *testing.T) {
 	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
 	router.LoadHTMLGlob("../templates/*")
 	store := cookie.NewStore([]byte("secret"))
-	router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
+	router.Use(sessions.SessionsMany([]string{sessionkeys.SessionName, sessionkeys.UserSessionName, sessionkeys.SessionValidationName, sessionkeys.LanguageSessionName}, store))
 
 	var session sessions.Session
 	router.GET("/logout", func(c *gin.Context) {
-		session = sessions.DefaultMany(c, "user_session")
+		session = sessions.DefaultMany(c, sessionkeys.UserSessionName)
 		session.Set("foobar", "fizzbuzz")
 		require.NoError(t, session.Save())
 		require.NotNil(t, session.Get("foobar"))
@@ -444,15 +445,15 @@ func newAuthMiddlewareRouter(t *testing.T, authObj *authenticate.Auth, withToken
 	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
 	router.LoadHTMLGlob("../templates/*")
 	store := cookie.NewStore([]byte("secret"))
-	router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+	router.Use(sessions.SessionsMany([]string{sessionkeys.SessionName, sessionkeys.UserSessionName, sessionkeys.SessionValidationName, sessionkeys.LanguageSessionName}, store))
 
 	router.Use(func(c *gin.Context) {
 		if withToken {
-			session := sessions.DefaultMany(c, "user_session")
+			session := sessions.DefaultMany(c, sessionkeys.UserSessionName)
 			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
 			require.NoError(t, session.Save())
 
-			validationSession := sessions.DefaultMany(c, "session_validation")
+			validationSession := sessions.DefaultMany(c, sessionkeys.SessionValidationName)
 			validationSession.Set(authenticate.SESSION_VALID_KEY, sessionValid)
 			require.NoError(t, validationSession.Save())
 		}
@@ -472,18 +473,18 @@ func newAuthMiddlewareRouter(t *testing.T, authObj *authenticate.Auth, withToken
 }
 
 func TestAuthenticatedWithUac(t *testing.T) {
-	newAuth := func(mockJwtCrypto *mockauth.JWTCryptoInterface) *authenticate.Auth {
-		languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+	newAuth := func(mockJwtCrypto *authmocks.JWTCryptoInterface) *authenticate.Auth {
+		languageManagerMock := &languagemocks.LanguageManagerInterface{}
 		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 		return &authenticate.Auth{
 			JWTCrypto:       mockJwtCrypto,
-			CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"},
+			CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: sessionkeys.SessionName},
 			LanguageManager: languageManagerMock,
 		}
 	}
 
 	t.Run("token decrypts and session valid", func(t *testing.T) {
-		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto := &authmocks.JWTCryptoInterface{}
 		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
 		authObj := newAuth(mockJwtCrypto)
 		_, recorder := newAuthMiddlewareRouter(t, authObj, true, true)
@@ -493,7 +494,7 @@ func TestAuthenticatedWithUac(t *testing.T) {
 	})
 
 	t.Run("token decrypts but session invalid", func(t *testing.T) {
-		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto := &authmocks.JWTCryptoInterface{}
 		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
 		authObj := newAuth(mockJwtCrypto)
 		_, recorder := newAuthMiddlewareRouter(t, authObj, true, false)
@@ -503,7 +504,7 @@ func TestAuthenticatedWithUac(t *testing.T) {
 	})
 
 	t.Run("token cannot be decrypted", func(t *testing.T) {
-		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto := &authmocks.JWTCryptoInterface{}
 		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
 		authObj := newAuth(mockJwtCrypto)
 		_, recorder := newAuthMiddlewareRouter(t, authObj, true, true)
@@ -513,7 +514,7 @@ func TestAuthenticatedWithUac(t *testing.T) {
 	})
 
 	t.Run("no token", func(t *testing.T) {
-		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto := &authmocks.JWTCryptoInterface{}
 		authObj := newAuth(mockJwtCrypto)
 		_, recorder := newAuthMiddlewareRouter(t, authObj, false, false)
 
@@ -526,9 +527,9 @@ func TestHasSession(t *testing.T) {
 	runHasSession := func(t *testing.T, claim *authenticate.UACClaims, decryptErr error) *httptest.ResponseRecorder {
 		t.Helper()
 
-		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto := &authmocks.JWTCryptoInterface{}
 		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(claim, decryptErr)
-		languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+		languageManagerMock := &languagemocks.LanguageManagerInterface{}
 		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 
 		authObj := &authenticate.Auth{
@@ -540,10 +541,10 @@ func TestHasSession(t *testing.T) {
 		router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
 		router.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+		router.Use(sessions.SessionsMany([]string{sessionkeys.SessionName, sessionkeys.UserSessionName, sessionkeys.SessionValidationName, sessionkeys.LanguageSessionName}, store))
 
 		router.Use(func(c *gin.Context) {
-			session := sessions.DefaultMany(c, "user_session")
+			session := sessions.DefaultMany(c, sessionkeys.UserSessionName)
 			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
 			require.NoError(t, session.Save())
 			c.Next()
@@ -605,10 +606,10 @@ func TestForbidden(t *testing.T) {
 }
 
 func TestRefreshToken(t *testing.T) {
-	runRefresh := func(t *testing.T, initialToken interface{}, sessionValidValue interface{}, setupMock func(*mockauth.JWTCryptoInterface, *authenticate.UACClaims)) (sessions.Session, *httptest.ResponseRecorder, *mockauth.JWTCryptoInterface) {
+	runRefresh := func(t *testing.T, initialToken interface{}, sessionValidValue interface{}, setupMock func(*authmocks.JWTCryptoInterface, *authenticate.UACClaims)) (sessions.Session, *httptest.ResponseRecorder, *authmocks.JWTCryptoInterface) {
 		t.Helper()
 
-		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto := &authmocks.JWTCryptoInterface{}
 		if setupMock != nil {
 			claim := &authenticate.UACClaims{
 				UAC:         "123456789012",
@@ -621,7 +622,7 @@ func TestRefreshToken(t *testing.T) {
 			setupMock(mockJwtCrypto, claim)
 		}
 
-		languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+		languageManagerMock := &languagemocks.LanguageManagerInterface{}
 		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 		authObj := &authenticate.Auth{
 			JWTCrypto:       mockJwtCrypto,
@@ -639,17 +640,17 @@ func TestRefreshToken(t *testing.T) {
 
 		router := gin.Default()
 		store := cookie.NewStore([]byte("secret"))
-		router.Use(sessions.SessionsMany([]string{"user_session", "session_validation"}, store))
+		router.Use(sessions.SessionsMany([]string{sessionkeys.UserSessionName, sessionkeys.SessionValidationName}, store))
 
 		var userSession sessions.Session
 		router.GET("/refresh", func(c *gin.Context) {
-			userSession = sessions.DefaultMany(c, "user_session")
+			userSession = sessions.DefaultMany(c, sessionkeys.UserSessionName)
 			if initialToken != nil {
 				userSession.Set(authenticate.JWT_TOKEN_KEY, initialToken)
 				require.NoError(t, userSession.Save())
 			}
 
-			validationSession := sessions.DefaultMany(c, "session_validation")
+			validationSession := sessions.DefaultMany(c, sessionkeys.SessionValidationName)
 			validationSession.Set(authenticate.SESSION_VALID_KEY, sessionValidValue)
 			require.NoError(t, validationSession.Save())
 
@@ -666,7 +667,7 @@ func TestRefreshToken(t *testing.T) {
 	}
 
 	t.Run("refreshes token when existing and session valid", func(t *testing.T) {
-		session, recorder, _ := runRefresh(t, "existing-token", true, func(m *mockauth.JWTCryptoInterface, claim *authenticate.UACClaims) {
+		session, recorder, _ := runRefresh(t, "existing-token", true, func(m *authmocks.JWTCryptoInterface, claim *authenticate.UACClaims) {
 			m.On("EncryptJWT", claim.UAC, &claim.UACInfo, claim.AuthTimeout).Return("refreshed-token", nil).Once()
 		})
 		assert.Equal(t, http.StatusNoContent, recorder.Code)
@@ -687,7 +688,7 @@ func TestRefreshToken(t *testing.T) {
 	})
 
 	t.Run("keeps existing token when encryption fails", func(t *testing.T) {
-		session, recorder, _ := runRefresh(t, "existing-token", true, func(m *mockauth.JWTCryptoInterface, claim *authenticate.UACClaims) {
+		session, recorder, _ := runRefresh(t, "existing-token", true, func(m *authmocks.JWTCryptoInterface, claim *authenticate.UACClaims) {
 			m.On("EncryptJWT", claim.UAC, &claim.UACInfo, claim.AuthTimeout).Return("", fmt.Errorf("encrypt failed")).Once()
 		})
 		assert.Equal(t, http.StatusNoContent, recorder.Code)
@@ -713,11 +714,11 @@ func TestLoginWelshValidation(t *testing.T) {
 	runWelshLogin := func(t *testing.T, uacKind string) *httptest.ResponseRecorder {
 		t.Helper()
 
-		languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+		languageManagerMock := &languagemocks.LanguageManagerInterface{}
 		languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
 		authObj := &authenticate.Auth{
 			Logger:          zap.NewNop(),
-			CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"},
+			CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: sessionkeys.SessionName},
 			LanguageManager: languageManagerMock,
 			UACKind:         uacKind,
 		}
@@ -726,9 +727,9 @@ func TestLoginWelshValidation(t *testing.T) {
 		router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
 		router.LoadHTMLGlob("../templates/*")
 		store := cookie.NewStore([]byte("secret"))
-		router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+		router.Use(sessions.SessionsMany([]string{sessionkeys.SessionName, sessionkeys.UserSessionName, sessionkeys.SessionValidationName, sessionkeys.LanguageSessionName}, store))
 		router.POST("/login", func(c *gin.Context) {
-			session := sessions.DefaultMany(c, "user_session")
+			session := sessions.DefaultMany(c, sessionkeys.UserSessionName)
 			authObj.Login(c, session)
 		})
 

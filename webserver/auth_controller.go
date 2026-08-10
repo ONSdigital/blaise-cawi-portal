@@ -7,6 +7,7 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -15,7 +16,6 @@ import (
 type AuthController struct {
 	Auth            authenticate.AuthInterface
 	Logger          *zap.Logger
-	UACKind         string
 	CSRFManager     csrf.CSRFManager
 	LanguageManager languagemanager.LanguageManagerInterface
 }
@@ -49,20 +49,20 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 	}
 
 	context.HTML(http.StatusOK, "login.tmpl", gin.H{
-		"uac16":      authController.isUAC16(),
+		"uac16":      authController.Auth.IsUAC16(),
 		"csrf_token": authController.CSRFManager.GetToken(context),
 		"welsh":      authController.LanguageManager.IsWelsh(context),
 	})
 }
 
 func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 
 	authController.Auth.Login(context, session)
 }
 
 func (authController *AuthController) LogoutEndpoint(context *gin.Context) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 
 	authController.Auth.Logout(context, session)
 }
@@ -77,7 +77,7 @@ func (authController *AuthController) LoggedInEndpoint(context *gin.Context) {
 }
 
 func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 
 	timeout := authenticate.DefaultAuthTimeout
 	if timeoutValue := session.Get(authenticate.SESSION_TIMEOUT_KEY); timeoutValue != nil {
@@ -92,6 +92,3 @@ func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
 	})
 }
 
-func (authController *AuthController) isUAC16() bool {
-	return authController.UACKind == "uac16"
-}

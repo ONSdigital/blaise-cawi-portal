@@ -13,9 +13,10 @@ import (
 	"time"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
-	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
+	authmocks "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
-	languageManagerMocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
+	languagemocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -27,17 +28,8 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-type TestResponseRecorder struct {
-	*httptest.ResponseRecorder
-	closeChannel chan bool
-}
-
-func (r *TestResponseRecorder) CloseNotify() <-chan bool {
-	return r.closeChannel
-}
-
-func createTestResponseRecorder() *TestResponseRecorder {
-	return &TestResponseRecorder{httptest.NewRecorder(), make(chan bool, 1)}
+func createTestResponseRecorder() *httptest.ResponseRecorder {
+	return httptest.NewRecorder()
 }
 
 type ErrReader struct{ Error error }
@@ -52,9 +44,9 @@ type instrumentHarness struct {
 	caseID               string
 	responseInfo         string
 	router               *gin.Engine
-	mockAuth             *mocks.AuthInterface
-	mockJWTCrypto        *mocks.JWTCryptoInterface
-	languageManagerMock  *languageManagerMocks.LanguageManagerInterface
+	mockAuth             *authmocks.AuthInterface
+	mockJWTCrypto        *authmocks.JWTCryptoInterface
+	languageManagerMock  *languagemocks.LanguageManagerInterface
 	instrumentController *webserver.InstrumentController
 	observedLogs         *observer.ObservedLogs
 }
@@ -67,16 +59,16 @@ func newInstrumentHarness(t *testing.T) *instrumentHarness {
 		instrumentName:      "foobar",
 		caseID:              "fizzbuzz",
 		responseInfo:        "<html><head></head><body></body></html>",
-		mockAuth:            &mocks.AuthInterface{},
-		mockJWTCrypto:       &mocks.JWTCryptoInterface{},
-		languageManagerMock: &languageManagerMocks.LanguageManagerInterface{},
+		mockAuth:            &authmocks.AuthInterface{},
+		mockJWTCrypto:       &authmocks.JWTCryptoInterface{},
+		languageManagerMock: &languagemocks.LanguageManagerInterface{},
 	}
 
 	h.router = gin.Default()
 	h.router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
 	h.router.LoadHTMLGlob("../templates/*")
 	store := cookie.NewStore([]byte("secret"))
-	h.router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+	h.router.Use(sessions.SessionsMany([]string{sessionkeys.SessionName, sessionkeys.UserSessionName, sessionkeys.SessionValidationName, sessionkeys.LanguageSessionName}, store))
 
 	var observedZapCore zapcore.Core
 	observedZapCore, h.observedLogs = observer.New(zap.InfoLevel)
@@ -101,7 +93,7 @@ func newInstrumentHarness(t *testing.T) *instrumentHarness {
 	return h
 }
 
-func (h *instrumentHarness) get(t *testing.T, path string) *TestResponseRecorder {
+func (h *instrumentHarness) get(t *testing.T, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	recorder := createTestResponseRecorder()
 	req, err := http.NewRequest(http.MethodGet, path, nil)
@@ -112,7 +104,7 @@ func (h *instrumentHarness) get(t *testing.T, path string) *TestResponseRecorder
 	return recorder
 }
 
-func (h *instrumentHarness) post(t *testing.T, path string, body io.Reader) *TestResponseRecorder {
+func (h *instrumentHarness) post(t *testing.T, path string, body io.Reader) *httptest.ResponseRecorder {
 	t.Helper()
 	recorder := createTestResponseRecorder()
 	req, err := http.NewRequest(http.MethodPost, path, body)
@@ -365,11 +357,11 @@ func TestInstrumentProxyPostRequests(t *testing.T) {
 }
 
 func TestInstrumentLogoutRoute(t *testing.T) {
-	mockAuth := &mocks.AuthInterface{}
+	mockAuth := &authmocks.AuthInterface{}
 	instrumentController := &webserver.InstrumentController{Auth: mockAuth}
 	router := gin.Default()
 	store := cookie.NewStore([]byte("secret"))
-	router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
+	router.Use(sessions.SessionsMany([]string{sessionkeys.SessionName, sessionkeys.UserSessionName, sessionkeys.SessionValidationName}, store))
 	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
 	router.LoadHTMLGlob("../templates/*")
 	instrumentController.AddRoutes(router)

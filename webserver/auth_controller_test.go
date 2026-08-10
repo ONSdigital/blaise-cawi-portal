@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
-	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
+	authmocks "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/csrf"
-	languageManagerMocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
+	languagemocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -26,9 +26,9 @@ import (
 
 type authControllerHarness struct {
 	router              *gin.Engine
-	mockAuth            *mocks.AuthInterface
+	mockAuth            *authmocks.AuthInterface
 	csrfManager         *csrf.DefaultCSRFManager
-	languageManagerMock *languageManagerMocks.LanguageManagerInterface
+	languageManagerMock *languagemocks.LanguageManagerInterface
 	authController      *webserver.AuthController
 	observedLogs        *observer.ObservedLogs
 	config              *webserver.Config
@@ -37,14 +37,15 @@ type authControllerHarness struct {
 func newAuthControllerHarness(t *testing.T) *authControllerHarness {
 	t.Helper()
 
-	mockAuth := &mocks.AuthInterface{}
+	mockAuth := &authmocks.AuthInterface{}
 	csrfManager := &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"}
-	languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+	languageManagerMock := &languagemocks.LanguageManagerInterface{}
 	config := &webserver.Config{UACKind: "uac16"}
 
 	var observedZapCore zapcore.Core
 	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
 	observedLogger := zap.New(observedZapCore)
+	_ = observedLogger.Sync()
 
 	csrfManager.ErrorFunc = webserver.CSRFErrorFunc(csrfManager, config, observedLogger, languageManagerMock)
 	router := gin.Default()
@@ -56,7 +57,6 @@ func newAuthControllerHarness(t *testing.T) *authControllerHarness {
 	authController := &webserver.AuthController{
 		Auth:            mockAuth,
 		CSRFManager:     csrfManager,
-		UACKind:         "uac",
 		LanguageManager: languageManagerMock,
 		Logger:          observedLogger,
 	}
@@ -119,6 +119,7 @@ func TestAuthControllerLoginEndpoint(t *testing.T) {
 	t.Run("without active session returns login in english", func(t *testing.T) {
 		h := newAuthControllerHarness(t)
 		h.mockAuth.On("HasSession", mock.Anything).Return(false, nil)
+		h.mockAuth.On("IsUAC16").Return(false)
 		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 		h.languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
 
@@ -137,6 +138,7 @@ func TestAuthControllerLoginEndpoint(t *testing.T) {
 	t.Run("without active session returns login in welsh", func(t *testing.T) {
 		h := newAuthControllerHarness(t)
 		h.mockAuth.On("HasSession", mock.Anything).Return(false, nil)
+		h.mockAuth.On("IsUAC16").Return(false)
 		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
 		h.languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
 
@@ -175,6 +177,7 @@ func TestAuthControllerPostLoginEndpoint(t *testing.T) {
 		h := newAuthControllerHarness(t)
 		h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
 		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+		h.languageManagerMock.On("LanguageError", authenticate.CSRF_ERR, mock.Anything).Return("Request timed out, please try again")
 
 		recorder, err := h.post("/auth/login", "", nil)
 		if err != nil {
@@ -192,6 +195,7 @@ func TestAuthControllerPostLoginEndpoint(t *testing.T) {
 		h := newAuthControllerHarness(t)
 		h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
 		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
+		h.languageManagerMock.On("LanguageError", authenticate.CSRF_ERR, mock.Anything).Return("Cais wedi dod i ben, triwch eto")
 
 		recorder, err := h.post("/auth/login", "", nil)
 		if err != nil {
@@ -209,6 +213,7 @@ func TestAuthControllerPostLoginEndpoint(t *testing.T) {
 		h := newAuthControllerHarness(t)
 		h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
 		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+		h.languageManagerMock.On("LanguageError", authenticate.CSRF_ERR, mock.Anything).Return("Request timed out, please try again")
 
 		recorder := httptest.NewRecorder()
 		req, err := http.NewRequest(http.MethodPost, "/auth/login?_csrf=dalajksdqoosk", nil)
@@ -252,7 +257,7 @@ func TestAuthControllerPostLoginEndpoint(t *testing.T) {
 	t.Run("invalid UAC shows mode-specific message", func(t *testing.T) {
 		t.Run("12-digit mode", func(t *testing.T) {
 			h := newAuthControllerHarness(t)
-			h.authController.UACKind = "uac"
+			h.mockAuth.On("IsUAC16").Return(false)
 			h.config.UACKind = "uac"
 			h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
 			h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
@@ -273,7 +278,7 @@ func TestAuthControllerPostLoginEndpoint(t *testing.T) {
 
 		t.Run("16-character mode", func(t *testing.T) {
 			h := newAuthControllerHarness(t)
-			h.authController.UACKind = "uac16"
+			h.mockAuth.On("IsUAC16").Return(true)
 			h.config.UACKind = "uac16"
 			h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
 			h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)

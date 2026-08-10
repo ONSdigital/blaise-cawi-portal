@@ -2,6 +2,7 @@ package webserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,11 +11,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-// TODO(Blaise 5.16 upgrade): remove support for the legacy default.aspx launch route.
+// TODO (Blaise 5.16 upgrade): remove support for the legacy default.aspx launch route.
 // In newer Blaise questionnaires, default.aspx is removed and the launch request should
 // hit the instrument root URL (served via MVC views such as _Layout.cshtml).
 var launchPaths = []string{"default.aspx", ""}
@@ -65,7 +66,7 @@ func (instrumentController *InstrumentController) AddRoutes(httpRouter *gin.Engi
 }
 
 func (instrumentController *InstrumentController) instrumentAuth(context *gin.Context) (*authenticate.UACClaims, error) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 	jwtToken := session.Get(authenticate.JWT_TOKEN_KEY)
 	uacClaim, err := instrumentController.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
@@ -141,11 +142,8 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 func (instrumentController *InstrumentController) launchCase(context *gin.Context, uacClaim *authenticate.UACClaims) (*http.Response, error) {
 	form := blaise.CasePayload(uacClaim.UACInfo.CaseID, instrumentController.LanguageManager.IsWelsh(context)).Form()
 
-	for i, path := range launchPaths {
-		launchURL := fmt.Sprintf("%s/%s/", instrumentController.CatiURL, uacClaim.UACInfo.InstrumentName)
-		if path != "" {
-			launchURL = fmt.Sprintf("%s/%s/%s", instrumentController.CatiURL, uacClaim.UACInfo.InstrumentName, path)
-		}
+	for _, path := range launchPaths {
+		launchURL := fmt.Sprintf("%s/%s/%s", instrumentController.CatiURL, uacClaim.UACInfo.InstrumentName, path)
 
 		resp, err := instrumentController.HttpClient.PostForm(
 			launchURL,
@@ -156,7 +154,7 @@ func (instrumentController *InstrumentController) launchCase(context *gin.Contex
 		}
 
 		// TODO(Blaise 5.16 upgrade): delete this 404 fallback branch when default.aspx is retired.
-		if resp.StatusCode == http.StatusNotFound && i < len(launchPaths)-1 {
+		if resp.StatusCode == http.StatusNotFound && path != "" {
 			resp.Body.Close()
 			continue
 		}
@@ -212,11 +210,11 @@ func (instrumentController *InstrumentController) startInterviewAuth(context *gi
 	return false
 }
 
-func (instrumentController *InstrumentController) proxy(context *gin.Context, uacClaim *authenticate.UACClaims) {
+func (instrumentController *InstrumentController) proxy(ginCtx *gin.Context, uacClaim *authenticate.UACClaims) {
 	remote, err := url.Parse(instrumentController.CatiURL)
 	if err != nil {
 		instrumentController.logger().Error("Could not parse url for proxying", zap.String("URL", instrumentController.CatiURL))
-		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
+		InternalServerError(ginCtx, instrumentController.LanguageManager.IsWelsh(ginCtx))
 		return
 	}
 
@@ -226,11 +224,13 @@ func (instrumentController *InstrumentController) proxy(context *gin.Context, ua
 		proxy.Transport = &debugTransport{Logger: instrumentController.logger()}
 	}
 
-	proxy.ServeHTTP(context.Writer, context.Request)
+	ctx, cancel := context.WithCancel(ginCtx.Request.Context())
+	defer cancel()
+	proxy.ServeHTTP(ginCtx.Writer, ginCtx.Request.WithContext(ctx))
 }
 
 func (instrumentController *InstrumentController) logoutEndpoint(context *gin.Context) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 	instrumentController.Auth.Logout(context, session)
 }
 
@@ -239,10 +239,7 @@ func isStartInterviewUrl(path, resource string) bool {
 }
 
 func isAPICall(context *gin.Context) bool {
-	path := context.Param("path")
-	resource := context.Param("resource")
-	return path == "api" || resource == "api" ||
-		strings.Contains(path, "/api/") || strings.Contains(resource, "/api/")
+	return context.Param("path") == "api" || context.Param("resource") == "api"
 }
 
 func InjectScript(body []byte) (*html.Node, error) {

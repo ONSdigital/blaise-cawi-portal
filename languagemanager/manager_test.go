@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 )
 
 func TestIsWelsh(t *testing.T) {
-	manager := &languagemanager.Manager{SessionName: "language_session"}
+	manager := &languagemanager.Manager{SessionName: sessionkeys.LanguageSessionName}
 
 	runCase := func(t *testing.T, value interface{}, setValue bool, expected bool) {
 		t.Helper()
@@ -20,11 +21,11 @@ func TestIsWelsh(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		router := gin.Default()
 		store := cookie.NewStore([]byte("secret"))
-		router.Use(sessions.SessionsMany([]string{"language_session"}, store))
+		router.Use(sessions.SessionsMany([]string{sessionkeys.LanguageSessionName}, store))
 
 		router.GET("/", func(c *gin.Context) {
 			if setValue {
-				session := sessions.DefaultMany(c, "language_session")
+				session := sessions.DefaultMany(c, sessionkeys.LanguageSessionName)
 				session.Set("welsh", value)
 				if err := session.Save(); err != nil {
 					t.Fatalf("session.Save() error: %v", err)
@@ -58,11 +59,11 @@ func TestIsWelsh(t *testing.T) {
 }
 
 func TestSetWelsh(t *testing.T) {
-	manager := &languagemanager.Manager{SessionName: "language_session"}
+	manager := &languagemanager.Manager{SessionName: sessionkeys.LanguageSessionName}
 	recorder := httptest.NewRecorder()
 	router := gin.Default()
 	store := cookie.NewStore([]byte("secret"))
-	router.Use(sessions.SessionsMany([]string{"language_session"}, store))
+	router.Use(sessions.SessionsMany([]string{sessionkeys.LanguageSessionName}, store))
 
 	router.GET("/set", func(c *gin.Context) {
 		manager.SetWelsh(c, true)
@@ -105,17 +106,17 @@ func TestSetWelsh(t *testing.T) {
 }
 
 func TestLanguageError(t *testing.T) {
-	manager := &languagemanager.Manager{SessionName: "language_session"}
+	manager := &languagemanager.Manager{SessionName: sessionkeys.LanguageSessionName}
 	languageErrors := map[string]string{"english": "Please continue in English", "welsh": "Parhewch yn Gymraeg"}
 
 	t.Run("returns welsh error when session is welsh", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		router := gin.Default()
 		store := cookie.NewStore([]byte("secret"))
-		router.Use(sessions.SessionsMany([]string{"language_session"}, store))
+		router.Use(sessions.SessionsMany([]string{sessionkeys.LanguageSessionName}, store))
 
 		router.GET("/", func(c *gin.Context) {
-			session := sessions.DefaultMany(c, "language_session")
+			session := sessions.DefaultMany(c, sessionkeys.LanguageSessionName)
 			session.Set("welsh", true)
 			if err := session.Save(); err != nil {
 				t.Fatalf("session.Save() error: %v", err)
@@ -140,7 +141,7 @@ func TestLanguageError(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		router := gin.Default()
 		store := cookie.NewStore([]byte("secret"))
-		router.Use(sessions.SessionsMany([]string{"language_session"}, store))
+		router.Use(sessions.SessionsMany([]string{sessionkeys.LanguageSessionName}, store))
 
 		router.GET("/", func(c *gin.Context) {
 			if got := manager.LanguageError(languageErrors, c); got != languageErrors["english"] {

@@ -32,34 +32,3 @@ func TestGetLangFromQuery(t *testing.T) {
 		})
 	}
 }
-
-func TestGetLangFromParam(t *testing.T) {
-	tests := []struct {
-		name     string
-		lang     string
-		expected string
-	}{
-		{name: "normalizes uppercase path param", lang: "CY", expected: "cy"},
-		{name: "keeps lowercase path param", lang: "en", expected: "en"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			recorder := httptest.NewRecorder()
-			context, _ := gin.CreateTestContext(recorder)
-			context.Params = gin.Params{{Key: "lang", Value: tt.lang}}
-
-			if got := languagemanager.GetLangFromParam(context); got != tt.expected {
-				t.Fatalf("GetLangFromParam() = %q, want %q", got, tt.expected)
-			}
-		})
-	}
-
-	t.Run("returns empty string if path param is missing", func(t *testing.T) {
-		recorder := httptest.NewRecorder()
-		context, _ := gin.CreateTestContext(recorder)
-		if got := languagemanager.GetLangFromParam(context); got != "" {
-			t.Fatalf("GetLangFromParam() = %q, want empty string", got)
-		}
-	})
-}

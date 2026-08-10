@@ -1,6 +1,7 @@
 package blaiserestapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 
 //go:generate mockery --name BlaiseRestAPIInterface
 type BlaiseRestAPIInterface interface {
-	GetInstrumentSettings(string) (InstrumentSettings, error)
+	GetInstrumentSettings(context.Context, string) (InstrumentSettings, error)
 }
 
 type InstrumentSettingsType struct {
@@ -53,8 +54,8 @@ func (blaiseRestApi *BlaiseRestAPI) logger() *zap.Logger {
 	return zap.L()
 }
 
-func (blaiseRestApi *BlaiseRestAPI) GetInstrumentSettings(instrumentName string) (InstrumentSettings, error) {
-	req, err := http.NewRequest(http.MethodGet, blaiseRestApi.instrumentSettingsURL(instrumentName), nil)
+func (blaiseRestApi *BlaiseRestAPI) GetInstrumentSettings(ctx context.Context, instrumentName string) (InstrumentSettings, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, blaiseRestApi.instrumentSettingsURL(instrumentName), nil)
 	if err != nil {
 		blaiseRestApi.logger().Error("Failed to create request to Blaise REST API",
 			zap.String("instrumentName", instrumentName),

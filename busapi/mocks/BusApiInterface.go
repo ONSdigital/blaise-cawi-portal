@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	"context"
+
 	busapi "github.com/ONSdigital/blaise-cawi-portal/busapi"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -12,20 +14,20 @@ type BUSAPIInterface struct {
 	mock.Mock
 }
 
-// GetUACInfo provides a mock function with given fields: _a0
-func (_m *BUSAPIInterface) GetUACInfo(_a0 string) (busapi.UACInfo, error) {
-	ret := _m.Called(_a0)
+// GetUACInfo provides a mock function with given fields: _a0, _a1
+func (_m *BUSAPIInterface) GetUACInfo(_a0 context.Context, _a1 string) (busapi.UACInfo, error) {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 busapi.UACInfo
-	if rf, ok := ret.Get(0).(func(string) busapi.UACInfo); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, string) busapi.UACInfo); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Get(0).(busapi.UACInfo)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}

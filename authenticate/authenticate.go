@@ -10,6 +10,7 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -36,11 +37,16 @@ var (
 		"english": "We were unable to process your request, please try again",
 		"welsh":   "Ni allwn brosesu eich cais, rhowch gynnig arall arni",
 	}
+	CSRF_ERR = map[string]string{
+		"english": "Request timed out, please try again",
+		"welsh":   "Cais wedi dod i ben, triwch eto",
+	}
 )
 
 //go:generate mockery --name AuthInterface
 type AuthInterface interface {
 	AuthenticatedWithUAC(*gin.Context)
+	IsUAC16() bool
 	Login(*gin.Context, sessions.Session)
 	Logout(*gin.Context, sessions.Session)
 	HasSession(*gin.Context) (bool, *UACClaims)
@@ -66,7 +72,7 @@ func (auth *Auth) logger() *zap.Logger {
 }
 
 func (auth *Auth) AuthenticatedWithUAC(context *gin.Context) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 	jwtToken := session.Get(JWT_TOKEN_KEY)
 
 	if jwtToken == nil || !auth.SessionValid(context) {
@@ -84,7 +90,7 @@ func (auth *Auth) AuthenticatedWithUAC(context *gin.Context) {
 }
 
 func (auth *Auth) HasSession(context *gin.Context) (bool, *UACClaims) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 	jwtToken := session.Get(JWT_TOKEN_KEY)
 
 	if jwtToken == nil {
@@ -110,7 +116,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	if auth.isUAC16() {
+	if auth.IsUAC16() {
 		uacLength = 16
 	}
 
@@ -121,13 +127,11 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	uacInfo, err := auth.BUSAPI.GetUACInfo(uac)
+	uacInfo, err := auth.BUSAPI.GetUACInfo(context.Request.Context(), uac)
 
 	if err != nil {
 		auth.logger().Error("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Error retrieving UAC information"),
-			zap.String("InstrumentName", uacInfo.InstrumentName),
-			zap.String("CaseIDFingerprint", CaseIDFingerprint(uacInfo.CaseID)),
 			zap.Error(err),
 		)...)
 
@@ -146,7 +150,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	instrumentSettings, err := auth.BlaiseRestAPI.GetInstrumentSettings(uacInfo.InstrumentName)
+	instrumentSettings, err := auth.BlaiseRestAPI.GetInstrumentSettings(context.Request.Context(), uacInfo.InstrumentName)
 	if err != nil {
 		if errors.Is(err, blaiserestapi.InstrumentNotFoundError) {
 			auth.logger().Warn("Failed auth", append(utils.GetRequestSource(context),
@@ -188,7 +192,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	validationSession := sessions.DefaultMany(context, "session_validation")
+	validationSession := sessions.DefaultMany(context, sessionkeys.SessionValidationName)
 	validationSession.Set(SESSION_VALID_KEY, true)
 	if err := validationSession.Save(); err != nil {
 		auth.logger().Error("Failed to save validation session", zap.Error(err))
@@ -224,7 +228,7 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 
 func (auth *Auth) notAuthed(context *gin.Context) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
-		"uac16":      auth.isUAC16(),
+		"uac16":      auth.IsUAC16(),
 		"csrf_token": auth.CSRFManager.GetToken(context),
 		"welsh":      auth.LanguageManager.IsWelsh(context),
 	})
@@ -234,7 +238,7 @@ func (auth *Auth) notAuthed(context *gin.Context) {
 func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
 		"error":      errorMessage,
-		"uac16":      auth.isUAC16(),
+		"uac16":      auth.IsUAC16(),
 		"csrf_token": auth.CSRFManager.GetToken(context),
 		"welsh":      auth.LanguageManager.IsWelsh(context),
 	})
@@ -273,7 +277,7 @@ func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, c
 }
 
 func (auth *Auth) SessionValid(context *gin.Context) bool {
-	validationSession := sessions.DefaultMany(context, "session_validation")
+	validationSession := sessions.DefaultMany(context, sessionkeys.SessionValidationName)
 	sessionValid := validationSession.Get(SESSION_VALID_KEY)
 	if sessionValid == nil {
 		return false
@@ -287,25 +291,25 @@ func (auth *Auth) SessionValid(context *gin.Context) bool {
 }
 
 func (auth *Auth) clearSessionValidation(context *gin.Context) error {
-	validationSession := sessions.DefaultMany(context, "session_validation")
+	validationSession := sessions.DefaultMany(context, sessionkeys.SessionValidationName)
 	validationSession.Set(SESSION_VALID_KEY, false)
 	validationSession.Clear()
 	validationSession.Options(sessions.Options{MaxAge: -1})
 	return validationSession.Save()
 }
 
-func (auth *Auth) isUAC16() bool {
+func (auth *Auth) IsUAC16() bool {
 	return auth.UACKind == "uac16"
 }
 
 func (auth *Auth) uacError(context *gin.Context) string {
 	if auth.LanguageManager.IsWelsh(context) {
-		if auth.isUAC16() {
+		if auth.IsUAC16() {
 			return fmt.Sprintf(INVALID_LENGTH_ERR["welsh"], "16 o nodau")
 		}
 		return fmt.Sprintf(INVALID_LENGTH_ERR["welsh"], "12 o nodau")
 	}
-	if auth.isUAC16() {
+	if auth.IsUAC16() {
 		return fmt.Sprintf(INVALID_LENGTH_ERR["english"], "16-character")
 	}
 	return fmt.Sprintf(INVALID_LENGTH_ERR["english"], "12-digit")

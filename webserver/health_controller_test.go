@@ -11,6 +11,7 @@ import (
 
 	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -217,14 +218,14 @@ func TestWebserverHelpers(t *testing.T) {
 	t.Run("creates csrf manager using session config", func(t *testing.T) {
 		config := &webserver.Config{SessionSecret: "session-secret"}
 		logger := zap.NewNop()
-		languageManager := &languagemanager.Manager{SessionName: "language_session"}
+		languageManager := &languagemanager.Manager{SessionName: sessionkeys.LanguageSessionName}
 
 		manager := webserver.NewCSRFManager(config, logger, languageManager)
 		typedManager, ok := manager.(*csrf.DefaultCSRFManager)
 		if !ok {
 			t.Fatal("manager is not *csrf.DefaultCSRFManager")
 		}
-		if typedManager.SessionName != "session" || typedManager.Secret != "session-secret" || typedManager.ErrorFunc == nil {
+		if typedManager.SessionName != sessionkeys.SessionName || typedManager.Secret != "session-secret" || typedManager.ErrorFunc == nil {
 			t.Fatalf("typedManager = %+v, expected session config and error func", typedManager)
 		}
 	})

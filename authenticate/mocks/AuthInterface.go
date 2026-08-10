@@ -21,6 +21,20 @@ func (_m *AuthInterface) AuthenticatedWithUAC(_a0 *gin.Context) {
 	_m.Called(_a0)
 }
 
+// IsUAC16 provides a mock function with given fields:
+func (_m *AuthInterface) IsUAC16() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // HasSession provides a mock function with given fields: _a0
 func (_m *AuthInterface) HasSession(_a0 *gin.Context) (bool, *authenticate.UACClaims) {
 	ret := _m.Called(_a0)

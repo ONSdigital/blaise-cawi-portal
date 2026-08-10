@@ -1,6 +1,7 @@
 package busapi_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -24,7 +25,7 @@ func TestBusApiGetUacInfo(t *testing.T) {
 		httpmock.RegisterResponder("POST", fmt.Sprintf("%s/uacs/uac", baseURL),
 			httpmock.NewJsonResponderOrPanic(200, busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}))
 
-		uacInfo, err := api.GetUACInfo(uac)
+		uacInfo, err := api.GetUACInfo(context.Background(), uac)
 		if err != nil {
 			t.Fatalf("GetUACInfo() unexpected error: %v", err)
 		}
@@ -41,7 +42,7 @@ func TestBusApiGetUacInfo(t *testing.T) {
 		httpmock.RegisterResponder("POST", fmt.Sprintf("%s/uacs/uac", baseURL),
 			httpmock.NewJsonResponderOrPanic(500, "nil"))
 
-		uacInfo, err := api.GetUACInfo(uac)
+		uacInfo, err := api.GetUACInfo(context.Background(), uac)
 		if err == nil {
 			t.Fatal("GetUACInfo() expected an error, got nil")
 		}

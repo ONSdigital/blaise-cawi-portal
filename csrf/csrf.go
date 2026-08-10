@@ -1,10 +1,10 @@
 package csrf
 
 import (
-	"crypto/sha256"
+	"crypto/sha1"
 	"encoding/base64"
+	"errors"
 	"io"
-	"net/http"
 
 	"github.com/dchest/uniuri"
 	"github.com/gin-contrib/sessions"
@@ -20,7 +20,7 @@ const (
 var defaultIgnoreMethods = []string{"GET", "HEAD", "OPTIONS"}
 
 var defaultErrorFunc = func(c *gin.Context) {
-	c.AbortWithStatus(http.StatusForbidden)
+	panic(errors.New("CSRF token mismatch"))
 }
 
 var defaultTokenGetter = func(c *gin.Context) string {
@@ -130,7 +130,7 @@ func (csrfManager *DefaultCSRFManager) getSession(c *gin.Context) sessions.Sessi
 }
 
 func tokenize(secret, salt string) string {
-	h := sha256.New()
+	h := sha1.New()
 	_, _ = io.WriteString(h, salt+"-"+secret)
 	hash := base64.URLEncoding.EncodeToString(h.Sum(nil))
 

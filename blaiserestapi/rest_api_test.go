@@ -1,6 +1,7 @@
 package blaiserestapi_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -29,7 +30,7 @@ func TestGetInstrumentSettings(t *testing.T) {
 		httpmock.Reset()
 		httpmock.RegisterResponder("GET", url, httpmock.NewBytesResponder(404, []byte{}))
 
-		instrumentSettings, err := blaiseRestAPI.GetInstrumentSettings(instrumentName)
+		instrumentSettings, err := blaiseRestAPI.GetInstrumentSettings(context.Background(), instrumentName)
 		if err == nil || err.Error() != "instrument not found" {
 			t.Fatalf("error = %v, want instrument not found", err)
 		}
@@ -46,7 +47,7 @@ func TestGetInstrumentSettings(t *testing.T) {
 				SessionTimeout: 15,
 			}}))
 
-		instrumentSettings, err := blaiseRestAPI.GetInstrumentSettings(instrumentName)
+		instrumentSettings, err := blaiseRestAPI.GetInstrumentSettings(context.Background(), instrumentName)
 		if err != nil {
 			t.Fatalf("GetInstrumentSettings() error: %v", err)
 		}

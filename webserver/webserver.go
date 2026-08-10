@@ -13,6 +13,7 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/blendle/zapdriver"
 	"github.com/gin-contrib/secure"
@@ -52,6 +53,7 @@ type Config struct {
 	Serverpark       string `default:"gusty"`
 	Port             string `default:"8082"`
 	UACKind          string `default:"uac" split_words:"true"`
+	// DevMode switches the session backend to cookie store (no Redis) and relaxes security middleware; it does not affect log verbosity.
 	DevMode          bool   `default:"false" split_words:"true"`
 	Debug            bool   `default:"false"`
 }
@@ -101,6 +103,7 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 		err    error
 	)
 	if config.DevMode {
+		// DevMode does not enable debug logging; use DEBUG=true for that.
 		logger, err = zapdriver.NewProduction()
 	} else {
 		var zapOptions []zap.Option
@@ -123,18 +126,11 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Logger, languageManager languagemanager.LanguageManagerInterface) func(*gin.Context) {
 	return func(context *gin.Context) {
 		logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
-		var errorMessage string
-		isWelsh := languageManager.IsWelsh(context)
-		if isWelsh {
-			errorMessage = "Cais wedi dod i ben, triwch eto"
-		} else {
-			errorMessage = "Request timed out, please try again"
-		}
 		context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
 			"uac16":      config.UACKind == "uac16",
-			"info":       errorMessage,
+			"info":       languageManager.LanguageError(authenticate.CSRF_ERR, context),
 			"csrf_token": csrfManager.GetToken(context),
-			"welsh":      isWelsh,
+			"welsh":      languageManager.IsWelsh(context),
 		})
 		context.Abort()
 	}
@@ -142,7 +138,7 @@ func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Log
 
 func NewCSRFManager(config *Config, logger *zap.Logger, languageManager languagemanager.LanguageManagerInterface) csrf.CSRFManager {
 	csrfManager := &csrf.DefaultCSRFManager{
-		SessionName: "session",
+		SessionName: sessionkeys.SessionName,
 		Secret:      config.SessionSecret,
 	}
 
@@ -152,9 +148,7 @@ func NewCSRFManager(config *Config, logger *zap.Logger, languageManager language
 }
 
 func UserSessionStore(config *Config) (sessions.Store, error) {
-	var (
-		store sessions.Store
-	)
+	var store sessions.Store
 	if config.DevMode {
 		store = cookie.NewStore([]byte(config.SessionSecret), []byte(config.EncryptionSecret))
 	} else {
@@ -166,7 +160,7 @@ func UserSessionStore(config *Config) (sessions.Store, error) {
 	}
 	store.Options(sessions.Options{
 		Path:     "/",
-		MaxAge:   60 * 60 * 24, // 1 days
+		MaxAge:   60 * 60 * 24, // 1 day
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
@@ -226,19 +220,19 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	sessionStores := []sessions.SessionStore{
 		{
-			Name:  "session",
+			Name:  sessionkeys.SessionName,
 			Store: cookieStore,
 		},
 		{
-			Name:  "user_session",
+			Name:  sessionkeys.UserSessionName,
 			Store: store,
 		},
 		{
-			Name:  "session_validation",
+			Name:  sessionkeys.SessionValidationName,
 			Store: store,
 		},
 		{
-			Name:  "language_session",
+			Name:  sessionkeys.LanguageSessionName,
 			Store: languageStore,
 		},
 	}
@@ -268,7 +262,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 		Logger:     logger,
 	}
 
-	languageManager := &languagemanager.Manager{SessionName: "language_session", Logger: logger}
+	languageManager := &languagemanager.Manager{SessionName: sessionkeys.LanguageSessionName, Logger: logger}
 	csrfManager := NewCSRFManager(server.Config, logger, languageManager)
 
 	auth := &authenticate.Auth{
@@ -287,7 +281,6 @@ func (server *Server) SetupRouter() *gin.Engine {
 	authController := &AuthController{
 		Auth:            auth,
 		Logger:          logger,
-		UACKind:         server.Config.UACKind,
 		CSRFManager:     csrfManager,
 		LanguageManager: languageManager,
 	}
@@ -313,12 +306,12 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.GET("/", authController.LoginEndpoint)
 
 	httpRouter.Any("/language/:lang", func(context *gin.Context) {
-		if languagemanager.GetLangFromParam(context) == "welsh" {
+		if strings.ToLower(context.Param("lang")) == "welsh" {
 			languageManager.SetWelsh(context, true)
 		} else {
 			languageManager.SetWelsh(context, false)
 		}
-		context.Status(200)
+		context.Status(http.StatusOK)
 	})
 
 	httpRouter.NoRoute(func(context *gin.Context) {

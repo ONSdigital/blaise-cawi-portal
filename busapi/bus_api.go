@@ -2,6 +2,7 @@ package busapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +11,7 @@ import (
 
 //go:generate mockery --name BUSAPIInterface
 type BUSAPIInterface interface {
-	GetUACInfo(string) (UACInfo, error)
+	GetUACInfo(context.Context, string) (UACInfo, error)
 }
 
 type BUSAPI struct {
@@ -22,8 +23,8 @@ type UACRequest struct {
 	UAC string `json:"uac"`
 }
 
-func (busApi *BUSAPI) GetUACInfo(uac string) (UACInfo, error) {
-	response, err := busApi.doGetUACInfo(uac)
+func (busApi *BUSAPI) GetUACInfo(ctx context.Context, uac string) (UACInfo, error) {
+	response, err := busApi.doGetUACInfo(ctx, uac)
 	if err != nil {
 		return UACInfo{}, err
 	}
@@ -41,14 +42,14 @@ func (busApi *BUSAPI) getUACInfoURL() (url string) {
 	)
 }
 
-func (busApi *BUSAPI) doGetUACInfo(uac string) (*http.Response, error) {
+func (busApi *BUSAPI) doGetUACInfo(ctx context.Context, uac string) (*http.Response, error) {
 	uacRequest := UACRequest{UAC: uac}
 	uacJSON, err := json.Marshal(uacRequest)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal UAC request: %w", err)
 	}
 
-	request, err := http.NewRequest(http.MethodPost, busApi.getUACInfoURL(),
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, busApi.getUACInfoURL(),
 		bytes.NewReader(uacJSON),
 	)
 

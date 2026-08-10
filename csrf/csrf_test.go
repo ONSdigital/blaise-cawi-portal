@@ -1,16 +1,31 @@
 package csrf
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 )
+
+// failSession is a sessions.Session whose Save always returns an error.
+type failSession struct{}
+
+func (failSession) ID() string                                      { return "" }
+func (failSession) Get(key interface{}) interface{}                 { return nil }
+func (failSession) Set(key interface{}, val interface{})            {}
+func (failSession) Delete(key interface{})                          {}
+func (failSession) Clear()                                          {}
+func (failSession) AddFlash(value interface{}, vars ...string)      {}
+func (failSession) Flashes(vars ...string) []interface{}            { return nil }
+func (failSession) Options(sessions.Options)                        {}
+func (failSession) Save() error                                     { return errors.New("store unavailable") }
 
 func buildRouter(csrfManager *DefaultCSRFManager) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -18,7 +33,7 @@ func buildRouter(csrfManager *DefaultCSRFManager) *gin.Engine {
 	store := cookie.NewStore([]byte("store-secret"))
 
 	if csrfManager.SessionName == "" {
-		router.Use(sessions.Sessions("session", store))
+		router.Use(sessions.Sessions(sessionkeys.SessionName, store))
 	} else {
 		router.Use(sessions.SessionsMany([]string{csrfManager.SessionName, "other"}, store))
 	}
@@ -137,7 +152,7 @@ func TestMiddlewareRejectsMismatchedToken(t *testing.T) {
 
 func TestMiddlewareAcceptsValidTokenWithNamedSession(t *testing.T) {
 	csrfManager := &DefaultCSRFManager{
-		SessionName: "session",
+		SessionName: sessionkeys.SessionName,
 		Secret:      "secret",
 		ErrorFunc: func(c *gin.Context) {
 			c.Status(http.StatusForbidden)
@@ -238,5 +253,27 @@ func TestDefaultTokenGetterOrder(t *testing.T) {
 				t.Fatalf("expected token %q, got %q", testCase.expected, token)
 			}
 		})
+	}
+}
+
+func TestGetTokenAbortsWithInternalServerErrorOnSessionSaveFailure(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	csrfManager := &DefaultCSRFManager{Secret: "secret"}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/token", nil)
+	c.Set(sessions.DefaultKey, failSession{})
+
+	token := csrfManager.GetToken(c)
+
+	if token != "" {
+		t.Fatalf("expected empty token on save failure, got %q", token)
+	}
+	if !c.IsAborted() {
+		t.Fatal("expected context to be aborted on session save failure")
+	}
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, recorder.Code)
 	}
 }

@@ -13,11 +13,3 @@ func GetLangFromQuery(context *gin.Context) string {
 	}
 	return ""
 }
-
-func GetLangFromParam(context *gin.Context) string {
-	lang, langPresent := context.Params.Get("lang")
-	if langPresent {
-		return strings.ToLower(lang)
-	}
-	return ""
-}
