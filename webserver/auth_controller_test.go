@@ -7,368 +7,401 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"testing"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	languageManagerMocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
-	csrf "github.com/srbry/gin-csrf"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
-
-	"github.com/gin-gonic/gin"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Auth Controller", func() {
-	var (
-		httpRouter  *gin.Engine
-		mockAuth    = &mocks.AuthInterface{}
-		csrfManager = &csrf.DefaultCSRFManager{
-			Secret:      "fwibble",
-			SessionName: "session",
-		}
-		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
-		authController      = &webserver.AuthController{
-			Auth:            mockAuth,
-			CSRFManager:     csrfManager,
-			UacKind:         "uac",
-			LanguageManager: languageManagerMock,
-		}
-		instrumentName  = "foobar"
-		caseID          = "fizzbuzz"
-		observedLogs    *observer.ObservedLogs
-		observedLogger  *zap.Logger
-		observedZapCore zapcore.Core
-		config          = &webserver.Config{UacKind: "uac16"}
+type authControllerHarness struct {
+	router              *gin.Engine
+	mockAuth            *mocks.AuthInterface
+	csrfManager         *csrf.DefaultCSRFManager
+	languageManagerMock *languageManagerMocks.LanguageManagerInterface
+	authController      *webserver.AuthController
+	observedLogs        *observer.ObservedLogs
+	config              *webserver.Config
+}
+
+func newAuthControllerHarness(t *testing.T) *authControllerHarness {
+	t.Helper()
+
+	mockAuth := &mocks.AuthInterface{}
+	csrfManager := &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"}
+	languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+	config := &webserver.Config{UACKind: "uac16"}
+
+	var observedZapCore zapcore.Core
+	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
+	observedLogger := zap.New(observedZapCore)
+
+	csrfManager.ErrorFunc = webserver.CSRFErrorFunc(csrfManager, config, observedLogger, languageManagerMock)
+	router := gin.Default()
+	store := cookie.NewStore([]byte("secret"))
+	router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
+	router.LoadHTMLGlob("../templates/*")
+
+	authController := &webserver.AuthController{
+		Auth:            mockAuth,
+		CSRFManager:     csrfManager,
+		UACKind:         "uac",
+		LanguageManager: languageManagerMock,
+		Logger:          observedLogger,
+	}
+	authController.AddRoutes(router)
+
+	return &authControllerHarness{
+		router:              router,
+		mockAuth:            mockAuth,
+		csrfManager:         csrfManager,
+		languageManagerMock: languageManagerMock,
+		authController:      authController,
+		observedLogs:        observedLogs,
+		config:              config,
+	}
+}
+
+func (h *authControllerHarness) get(path string) (*httptest.ResponseRecorder, error) {
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	h.router.ServeHTTP(recorder, req)
+	return recorder, nil
+}
+
+func (h *authControllerHarness) post(path string, body string, headers map[string]string) (*httptest.ResponseRecorder, error) {
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	h.router.ServeHTTP(recorder, req)
+	return recorder, nil
+}
+
+func (h *authControllerHarness) csrfTokenAndCookie(t *testing.T) (string, string) {
+	t.Helper()
+	var csrfToken string
+	h.router.GET("/token", func(c *gin.Context) {
+		csrfToken = h.csrfManager.GetToken(c)
+	})
+
+	recorder, err := h.get("/token")
+	if err != nil {
+		t.Fatalf("get(/token) error: %v", err)
+	}
+	return csrfToken, recorder.Header().Get("Set-Cookie")
+}
+
+func TestAuthControllerLoginEndpoint(t *testing.T) {
+	const (
+		instrumentName = "foobar"
+		caseID         = "fizzbuzz"
 	)
 
-	BeforeEach(func() {
-		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
-		observedLogger = zap.New(observedZapCore)
-		_ = observedLogger.Sync()
-		csrfManager.ErrorFunc = webserver.CSRFErrorFunc(csrfManager, config, observedLogger, languageManagerMock)
-		httpRouter = gin.Default()
-		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
-		httpRouter.SetFuncMap(template.FuncMap{
-			"WrapWelsh": webserver.WrapWelsh,
-		})
-		httpRouter.LoadHTMLGlob("../templates/*")
-		authController.Logger = observedLogger
-		authController.AddRoutes(httpRouter)
+	t.Run("without active session returns login in english", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("HasSession", mock.Anything).Return(false, nil)
+		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+		h.languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
+
+		recorder, err := h.get("/auth/login")
+		if err != nil {
+			t.Fatalf("get(/auth/login) error: %v", err)
+		}
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		if !strings.Contains(recorder.Body.String(), `<html lang="en">`) || !strings.Contains(recorder.Body.String(), `Access study`) {
+			t.Fatalf("unexpected response body: %s", recorder.Body.String())
+		}
 	})
 
-	AfterEach(func() {
-		mockAuth = &mocks.AuthInterface{}
-		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
-		authController = &webserver.AuthController{Auth: mockAuth, CSRFManager: csrfManager, LanguageManager: languageManagerMock}
+	t.Run("without active session returns login in welsh", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("HasSession", mock.Anything).Return(false, nil)
+		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
+		h.languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
+
+		recorder, err := h.get("/auth/login?lang=cy")
+		if err != nil {
+			t.Fatalf("get(/auth/login?lang=cy) error: %v", err)
+		}
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		if !strings.Contains(recorder.Body.String(), `<html lang="cy">`) || !strings.Contains(recorder.Body.String(), `Agor yr astudiaeth`) {
+			t.Fatalf("unexpected response body: %s", recorder.Body.String())
+		}
 	})
 
-	Describe("GET /auth/login", func() {
-		var (
-			httpRecorder  *httptest.ResponseRecorder
-			languageQuery string
-		)
+	t.Run("with active session redirects to instrument", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
+		h.mockAuth.On("HasSession", mock.Anything).Return(true, &authenticate.UACClaims{UACInfo: busapi.UACInfo{InstrumentName: instrumentName, CaseID: caseID}}, nil)
 
-		JustBeforeEach(func() {
-			languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
-			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("GET", fmt.Sprintf("/auth/login%s", languageQuery), nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
-		})
+		recorder, err := h.get("/auth/login")
+		if err != nil {
+			t.Fatalf("get(/auth/login) error: %v", err)
+		}
+		if recorder.Code != http.StatusTemporaryRedirect {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTemporaryRedirect)
+		}
+		if location := recorder.Header().Values("Location"); len(location) != 1 || location[0] != fmt.Sprintf("/%s/", instrumentName) {
+			t.Fatalf("Location = %v, want /%s/", location, instrumentName)
+		}
+	})
+}
 
-		Context("when I access auth/login I am presented with the login template", func() {
-			BeforeEach(func() {
-				mockAuth.On("HasSession", mock.Anything).Return(false, nil)
-			})
+func TestAuthControllerPostLoginEndpoint(t *testing.T) {
+	t.Run("without CSRF in english", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
+		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 
-			Context("in english", func() {
-				BeforeEach(func() {
-					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-				})
-				It("returns a 200 response and the login page", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<html lang="en">`))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Access study`))
-				})
-			})
-
-			Context("in welsh", func() {
-				BeforeEach(func() {
-					languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
-					languageQuery = "?lang=cy"
-				})
-
-				AfterEach(func() {
-					languageQuery = ""
-				})
-
-				It("returns a 200 response and the login page", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<html lang="cy">`))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Agor yr astudiaeth`))
-				})
-			})
-		})
-
-		Context("when I access auth/login with an active session", func() {
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-
-				mockAuth.On("HasSession", mock.Anything).Return(true, &authenticate.UACClaims{UacInfo: busapi.UacInfo{
-					InstrumentName: instrumentName,
-					CaseID:         caseID,
-				}}, nil)
-
-				req, _ := http.NewRequest("GET", "/auth/login", nil)
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			It("returns a temporary redirect response", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusTemporaryRedirect))
-
-				header := httpRecorder.Header()["Location"]
-				Expect(header).To(Equal([]string{fmt.Sprintf("/%s/", instrumentName)}))
-			})
-		})
+		recorder, err := h.post("/auth/login", "", nil)
+		if err != nil {
+			t.Fatalf("post(/auth/login) error: %v", err)
+		}
+		if recorder.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
+		}
+		if !strings.Contains(recorder.Body.String(), `<html lang="en">`) || !strings.Contains(recorder.Body.String(), `Request timed out, please try again`) {
+			t.Fatalf("unexpected response body: %s", recorder.Body.String())
+		}
 	})
 
-	Describe("POST /auth/login", func() {
-		var (
-			httpRecorder *httptest.ResponseRecorder
-		)
+	t.Run("without CSRF in welsh", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
+		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
 
-		BeforeEach(func() {
-			mockAuth.On("Login", mock.Anything, mock.Anything).Return()
-		})
-
-		Context("without a CSRF", func() {
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				req, _ := http.NewRequest("POST", "/auth/login", nil)
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			Context("in english", func() {
-				BeforeEach(func() {
-					languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-				})
-
-				It("gives an auth error", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<html lang="en">`))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Request timed out, please try again`))
-				})
-			})
-
-			Context("in welsh", func() {
-				BeforeEach(func() {
-					languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
-				})
-
-				It("gives an auth error", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`<html lang="cy">`))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Cais wedi dod i ben, triwch eto`))
-				})
-			})
-		})
-
-		Context("with an invalid CSRF", func() {
-			JustBeforeEach(func() {
-				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-				httpRecorder = httptest.NewRecorder()
-				req, _ := http.NewRequest("POST", "/auth/login?_csrf=dalajksdqoosk", nil)
-				req.RemoteAddr = "1.1.1.1"
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			It("gives an auth error", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-				Expect(httpRecorder.Body.String()).To(ContainSubstring(`Request timed out, please try again`))
-
-				Expect(observedLogs.Len()).To(Equal(1))
-				Expect(observedLogs.All()[0].Message).To(Equal("CSRF mismatch"))
-				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
-				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
-			})
-		})
-
-		Context("with a valid CSRF", func() {
-			var csrfToken string
-
-			JustBeforeEach(func() {
-				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-				httpRouter.GET("/token", func(context *gin.Context) {
-					csrfToken = csrfManager.GetToken(context)
-				})
-
-				req1, _ := http.NewRequest("GET", "/token", nil)
-
-				httpRecorder = httptest.NewRecorder()
-				httpRouter.ServeHTTP(httpRecorder, req1)
-
-				req2, _ := http.NewRequest("POST", fmt.Sprintf("/auth/login?_csrf=%s", csrfToken), nil)
-				req2.Header.Set("Cookie", httpRecorder.Header().Get("Set-Cookie"))
-				req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-				httpRecorder = httptest.NewRecorder()
-				httpRouter.ServeHTTP(httpRecorder, req2)
-			})
-
-			It("calls it auth.login", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				mockAuth.AssertNumberOfCalls(GinkgoT(), "Login", 1)
-			})
-		})
-
-		Context("with an invalid UAC Code", func() {
-			var csrfToken string
-
-			JustBeforeEach(func() {
-				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-				httpRouter.GET("/token", func(context *gin.Context) {
-					csrfToken = csrfManager.GetToken(context)
-				})
-
-				req1, _ := http.NewRequest("GET", "/token", nil)
-
-				httpRecorder = httptest.NewRecorder()
-				httpRouter.ServeHTTP(httpRecorder, req1)
-
-				httpRecorder = httptest.NewRecorder()
-				data := url.Values{
-					"uac":   []string{"123"},
-					"_csrf": []string{csrfToken},
-				}
-				req, _ := http.NewRequest("POST", "/auth/login", strings.NewReader(data.Encode()))
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			Context("Login with a 12 digit UAC kind", func() {
-				BeforeEach(func() {
-					authController.UacKind = "uac"
-					config.UacKind = "uac"
-				})
-
-				It("states a 12-digit access code is required", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 12-digit access code`))
-				})
-			})
-
-			Context("Login with a 16 character UAC kind", func() {
-				BeforeEach(func() {
-					authController.UacKind = "uac16"
-					config.UacKind = "uac16"
-				})
-
-				It("states a 16-character access code is required", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusForbidden))
-					Expect(httpRecorder.Body.String()).To(ContainSubstring(`Enter your 16-character access code`))
-				})
-			})
-		})
+		recorder, err := h.post("/auth/login", "", nil)
+		if err != nil {
+			t.Fatalf("post(/auth/login) error: %v", err)
+		}
+		if recorder.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
+		}
+		if !strings.Contains(recorder.Body.String(), `<html lang="cy">`) || !strings.Contains(recorder.Body.String(), `Cais wedi dod i ben, triwch eto`) {
+			t.Fatalf("unexpected response body: %s", recorder.Body.String())
+		}
 	})
 
-	Describe("GET /auth/logout", func() {
-		var (
-			httpRecorder *httptest.ResponseRecorder
-		)
+	t.Run("with invalid CSRF logs mismatch", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
+		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 
-		BeforeEach(func() {
-			languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-			mockAuth.On("Logout", mock.Anything, mock.Anything).Return()
-		})
+		recorder := httptest.NewRecorder()
+		req, err := http.NewRequest(http.MethodPost, "/auth/login?_csrf=dalajksdqoosk", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest() error: %v", err)
+		}
+		req.RemoteAddr = "1.1.1.1"
+		h.router.ServeHTTP(recorder, req)
 
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("GET", "/auth/logout", nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
-		})
-
-		It("calls it auth.logout", func() {
-			mockAuth.AssertNumberOfCalls(GinkgoT(), "Logout", 1)
-		})
+		if recorder.Code != http.StatusForbidden {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
+		}
+		if !strings.Contains(recorder.Body.String(), `Request timed out, please try again`) {
+			t.Fatalf("unexpected response body: %s", recorder.Body.String())
+		}
+		if h.observedLogs.Len() != 1 {
+			t.Fatalf("log count = %d, want 1", h.observedLogs.Len())
+		}
+		entry := h.observedLogs.All()[0]
+		if entry.Message != "CSRF mismatch" || entry.ContextMap()["SourceIP"] != "1.1.1.1" || entry.Level != zap.InfoLevel {
+			t.Fatalf("unexpected log entry: %+v", entry)
+		}
 	})
 
-	Describe("GET /auth/logged-in", func() {
-		var (
-			httpRecorder *httptest.ResponseRecorder
-		)
+	t.Run("with valid CSRF calls auth.Login", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
+		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+		csrfToken, cookieHeader := h.csrfTokenAndCookie(t)
 
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("GET", "/auth/logged-in", nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
-		})
-
-		Context("when you have an active session", func() {
-			BeforeEach(func() {
-				mockAuth.On("HasSession", mock.Anything).Return(true, nil)
-			})
-
-			It("returns OK", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			})
-		})
-
-		Context("when you don't have an active session", func() {
-			BeforeEach(func() {
-				mockAuth.On("HasSession", mock.Anything).Return(false, nil)
-			})
-
-			It("returns unauthorised", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-			})
-		})
+		recorder, err := h.post(fmt.Sprintf("/auth/login?_csrf=%s", csrfToken), "", map[string]string{"Cookie": cookieHeader, "Content-Type": "application/x-www-form-urlencoded"})
+		if err != nil {
+			t.Fatalf("post(/auth/login) error: %v", err)
+		}
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		h.mockAuth.AssertNumberOfCalls(t, "Login", 1)
 	})
 
-	Describe("Get /auth/timed-out", func() {
-		var (
-			httpRecorder *httptest.ResponseRecorder
-		)
+	t.Run("invalid UAC shows mode-specific message", func(t *testing.T) {
+		t.Run("12-digit mode", func(t *testing.T) {
+			h := newAuthControllerHarness(t)
+			h.authController.UACKind = "uac"
+			h.config.UACKind = "uac"
+			h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
+			h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+			csrfToken, _ := h.csrfTokenAndCookie(t)
 
-		JustBeforeEach(func() {
-			languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
-			httpRecorder = httptest.NewRecorder()
-			req, _ := http.NewRequest("GET", "/auth/timed-out", nil)
-			httpRouter.ServeHTTP(httpRecorder, req)
+			data := url.Values{"uac": []string{"123"}, "_csrf": []string{csrfToken}}
+			recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded"})
+			if err != nil {
+				t.Fatalf("post(/auth/login) error: %v", err)
+			}
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
+			}
+			if !strings.Contains(recorder.Body.String(), `Enter your 12-digit access code`) {
+				t.Fatalf("unexpected response body: %s", recorder.Body.String())
+			}
 		})
 
-		Context("in english", func() {
-			BeforeEach(func() {
-				languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-			})
+		t.Run("16-character mode", func(t *testing.T) {
+			h := newAuthControllerHarness(t)
+			h.authController.UACKind = "uac16"
+			h.config.UACKind = "uac16"
+			h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
+			h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+			csrfToken, _ := h.csrfTokenAndCookie(t)
 
-			It("returns the timed out page", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				body := httpRecorder.Body.String()
-				Expect(body).To(ContainSubstring(`Sorry, you need to sign in again`))
-				Expect(body).To(ContainSubstring(`This is because you've been inactive for 15 minutes and your session has timed out to protect your information.`))
-				Expect(body).To(ContainSubstring(`You need to <a href="/">sign back in</a> to continue your study.`))
-			})
-		})
-
-		Context("in welsh", func() {
-			BeforeEach(func() {
-				languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
-			})
-
-			It("returns the timed out page", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				body := httpRecorder.Body.String()
-				Expect(body).To(ContainSubstring(`Mae'n ddrwg gennym, mae angen i chi fewngofnodi eto`))
-				Expect(body).To(ContainSubstring(`Mae hyn oherwydd eich bod wedi bod yn anweithgar am 15 munud a bod eich sesiwn wedi cyrraedd y terfyn amser er mwyn diogelu eich gwybodaeth.`))
-				Expect(body).To(ContainSubstring(`Bydd angen i chi <a href="/">fewngofnodi eto</a> i barhau â'ch astudiaeth.`))
-			})
+			data := url.Values{"uac": []string{"123"}, "_csrf": []string{csrfToken}}
+			recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded"})
+			if err != nil {
+				t.Fatalf("post(/auth/login) error: %v", err)
+			}
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
+			}
+			if !strings.Contains(recorder.Body.String(), `Enter your 16-character access code`) {
+				t.Fatalf("unexpected response body: %s", recorder.Body.String())
+			}
 		})
 	})
-})
+}
+
+func TestAuthControllerLogoutEndpoint(t *testing.T) {
+	h := newAuthControllerHarness(t)
+	h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+	h.mockAuth.On("Logout", mock.Anything, mock.Anything).Return()
+
+	recorder, err := h.get("/auth/logout")
+	if err != nil {
+		t.Fatalf("get(/auth/logout) error: %v", err)
+	}
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	h.mockAuth.AssertNumberOfCalls(t, "Logout", 1)
+}
+
+func TestAuthControllerLoggedInEndpoint(t *testing.T) {
+	t.Run("returns OK when session active", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("HasSession", mock.Anything).Return(true, nil)
+		recorder, err := h.get("/auth/logged-in")
+		if err != nil {
+			t.Fatalf("get(/auth/logged-in) error: %v", err)
+		}
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+	})
+
+	t.Run("returns unauthorized when no active session", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("HasSession", mock.Anything).Return(false, nil)
+		recorder, err := h.get("/auth/logged-in")
+		if err != nil {
+			t.Fatalf("get(/auth/logged-in) error: %v", err)
+		}
+		if recorder.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+		}
+	})
+}
+
+func TestAuthControllerTimedOutEndpoint(t *testing.T) {
+	runTimedOut := func(t *testing.T, welsh bool, timeoutValue interface{}) *httptest.ResponseRecorder {
+		t.Helper()
+		h := newAuthControllerHarness(t)
+		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(welsh)
+		h.languageManagerMock.On("SetWelsh", mock.Anything, mock.Anything).Return()
+
+		var sessionCookie string
+		if timeoutValue != nil {
+			h.router.GET("/set-timeout", func(c *gin.Context) {
+				session := sessions.DefaultMany(c, "user_session")
+				session.Set(authenticate.SESSION_TIMEOUT_KEY, timeoutValue)
+				_ = session.Save()
+				c.Status(http.StatusNoContent)
+			})
+			cookieRecorder, err := h.get("/set-timeout")
+			if err != nil {
+				t.Fatalf("get(/set-timeout) error: %v", err)
+			}
+			sessionCookie = cookieRecorder.Header().Get("Set-Cookie")
+		}
+
+		recorder := httptest.NewRecorder()
+		req, err := http.NewRequest(http.MethodGet, "/auth/timed-out", nil)
+		if err != nil {
+			t.Fatalf("http.NewRequest() error: %v", err)
+		}
+		if sessionCookie != "" {
+			req.Header.Set("Cookie", sessionCookie)
+		}
+		h.router.ServeHTTP(recorder, req)
+		return recorder
+	}
+
+	t.Run("english response", func(t *testing.T) {
+		recorder := runTimedOut(t, false, nil)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		body := recorder.Body.String()
+		if !strings.Contains(body, `Sorry, you need to sign in again`) ||
+			!strings.Contains(body, `This is because you've been inactive for 15 minutes and your session has timed out to protect your information.`) ||
+			!strings.Contains(body, `You need to <a href="/">sign back in</a> to continue your study.`) {
+			t.Fatalf("unexpected body: %s", body)
+		}
+	})
+
+	t.Run("welsh response", func(t *testing.T) {
+		recorder := runTimedOut(t, true, nil)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		body := recorder.Body.String()
+		if !strings.Contains(body, `Mae'n ddrwg gennym, mae angen i chi fewngofnodi eto`) ||
+			!strings.Contains(body, `Mae hyn oherwydd eich bod wedi bod yn anweithgar am 15 munud a bod eich sesiwn wedi cyrraedd y terfyn amser er mwyn diogelu eich gwybodaeth.`) ||
+			!strings.Contains(body, `Bydd angen i chi <a href="/">fewngofnodi eto</a> i barhau â'ch astudiaeth.`) {
+			t.Fatalf("unexpected body: %s", body)
+		}
+	})
+
+	t.Run("malformed timeout falls back to default", func(t *testing.T) {
+		recorder := runTimedOut(t, false, "15")
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		if !strings.Contains(recorder.Body.String(), `you've been inactive for 15 minutes`) {
+			t.Fatalf("unexpected body: %s", recorder.Body.String())
+		}
+	})
+}

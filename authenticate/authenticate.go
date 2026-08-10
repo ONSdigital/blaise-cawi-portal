@@ -1,18 +1,18 @@
 package authenticate
 
 import (
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	csrf "github.com/srbry/gin-csrf"
 	"go.uber.org/zap"
 )
 
@@ -38,11 +38,9 @@ var (
 	}
 )
 
-// Generate mocks by running "go generate ./..."
-//
 //go:generate mockery --name AuthInterface
 type AuthInterface interface {
-	AuthenticatedWithUac(*gin.Context)
+	AuthenticatedWithUAC(*gin.Context)
 	Login(*gin.Context, sessions.Session)
 	Logout(*gin.Context, sessions.Session)
 	HasSession(*gin.Context) (bool, *UACClaims)
@@ -51,28 +49,35 @@ type AuthInterface interface {
 }
 
 type Auth struct {
-	BusApi          busapi.BusApiInterface
+	BUSAPI          busapi.BUSAPIInterface
 	JWTCrypto       JWTCryptoInterface
-	BlaiseRestApi   blaiserestapi.BlaiseRestApiInterface
+	BlaiseRestAPI   blaiserestapi.BlaiseRestAPIInterface
 	Logger          *zap.Logger
-	UacKind         string
+	UACKind         string
 	CSRFManager     csrf.CSRFManager
 	LanguageManager languagemanager.LanguageManagerInterface
 }
 
-func (auth *Auth) AuthenticatedWithUac(context *gin.Context) {
+func (auth *Auth) logger() *zap.Logger {
+	if auth.Logger != nil {
+		return auth.Logger
+	}
+	return zap.L()
+}
+
+func (auth *Auth) AuthenticatedWithUAC(context *gin.Context) {
 	session := sessions.DefaultMany(context, "user_session")
 	jwtToken := session.Get(JWT_TOKEN_KEY)
 
 	if jwtToken == nil || !auth.SessionValid(context) {
-		auth.notAuth(context)
+		auth.notAuthed(context)
 		return
 	}
 
 	_, err := auth.JWTCrypto.DecryptJWT(jwtToken)
 	if err != nil {
-		log.Println(err)
-		auth.notAuth(context)
+		auth.logger().Warn("Failed to decrypt JWT from session", append(utils.GetRequestSource(context), zap.Error(err))...)
+		auth.notAuthed(context)
 		return
 	}
 	context.Next()
@@ -99,54 +104,65 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	uac = strings.ReplaceAll(uac, " ", "")
 
 	if uac == "" {
-		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
+		auth.logger().Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Blank UAC"))...)
 		auth.NotAuthWithError(context, auth.uacError(context))
 		return
 	}
 
-	if auth.isUac16() {
+	if auth.isUAC16() {
 		uacLength = 16
 	}
 
 	if len(uac) != uacLength {
-		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
+		auth.logger().Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Invalid UAC length"), zap.Int("UACLength", uacLength))...)
 		auth.NotAuthWithError(context, auth.uacError(context))
 		return
 	}
 
-	uacInfo, err := auth.BusApi.GetUacInfo(uac)
+	uacInfo, err := auth.BUSAPI.GetUACInfo(uac)
 
-	if err != nil || uacInfo.InvalidCase() {
-		auth.Logger.Info("Failed auth", append(utils.GetRequestSource(context),
+	if err != nil {
+		auth.logger().Error("Failed auth", append(utils.GetRequestSource(context),
+			zap.String("Reason", "Error retrieving UAC information"),
+			zap.String("InstrumentName", uacInfo.InstrumentName),
+			zap.String("CaseIDFingerprint", CaseIDFingerprint(uacInfo.CaseID)),
+			zap.Error(err),
+		)...)
+
+		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
+		return
+	}
+
+	if uacInfo.InvalidCase() {
+		auth.logger().Info("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Access code not recognised"),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
-			zap.String("CaseID", uacInfo.CaseID),
-			zap.Error(err),
+			zap.String("CaseIDFingerprint", CaseIDFingerprint(uacInfo.CaseID)),
 		)...)
 
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(NOT_RECOGNISED_ERR, context))
 		return
 	}
 
-	instrumentSettings, err := auth.BlaiseRestApi.GetInstrumentSettings(uacInfo.InstrumentName)
+	instrumentSettings, err := auth.BlaiseRestAPI.GetInstrumentSettings(uacInfo.InstrumentName)
 	if err != nil {
-		if err == blaiserestapi.InstrumentNotFoundError {
-			auth.Logger.Warn("Failed auth", append(utils.GetRequestSource(context),
+		if errors.Is(err, blaiserestapi.InstrumentNotFoundError) {
+			auth.logger().Warn("Failed auth", append(utils.GetRequestSource(context),
 				zap.String("Reason", "Instrument not installed"),
 				zap.String("Notes", "This can happen if a UAC for a non-Blaise 5 survey has been entered"),
 				zap.String("InstrumentName", uacInfo.InstrumentName),
-				zap.String("CaseID", uacInfo.CaseID),
+				zap.String("CaseIDFingerprint", CaseIDFingerprint(uacInfo.CaseID)),
 				zap.Error(err),
 			)...)
 			auth.InstrumentNotInstalledError(context)
 			return
 		}
-		auth.Logger.Error("Failed auth", append(utils.GetRequestSource(context),
+		auth.logger().Error("Failed auth", append(utils.GetRequestSource(context),
 			zap.String("Reason", "Could not get instrument settings"),
 			zap.String("InstrumentName", uacInfo.InstrumentName),
-			zap.String("CaseID", uacInfo.CaseID),
+			zap.String("CaseIDFingerprint", CaseIDFingerprint(uacInfo.CaseID)),
 			zap.Error(err),
 		)...)
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
@@ -159,7 +175,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	}
 	signedToken, err := auth.JWTCrypto.EncryptJWT(uac, &uacInfo, sessionTimeout)
 	if err != nil {
-		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
+		auth.logger().Error("Failed to encrypt JWT", zap.Error(err))
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
 		return
 	}
@@ -167,7 +183,7 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	session.Set(JWT_TOKEN_KEY, signedToken)
 	session.Set(SESSION_TIMEOUT_KEY, sessionTimeout)
 	if err := session.Save(); err != nil {
-		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
+		auth.logger().Error("Failed to save JWT to session", zap.Error(err))
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
 		return
 	}
@@ -175,18 +191,15 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 	validationSession := sessions.DefaultMany(context, "session_validation")
 	validationSession.Set(SESSION_VALID_KEY, true)
 	if err := validationSession.Save(); err != nil {
-		auth.Logger.Error("Failed to save validationSession", zap.Error(err))
+		auth.logger().Error("Failed to save validation session", zap.Error(err))
 		auth.NotAuthWithError(context, auth.LanguageManager.LanguageError(INTERNAL_SERVER_ERR, context))
 		return
 	}
 
-	instrumentName := strings.ReplaceAll(uacInfo.InstrumentName, "\n", "")
-	instrumentName = strings.ReplaceAll(instrumentName, "\r", "")
+	instrumentName := utils.SanitizeLogInput(uacInfo.InstrumentName)
+	caseID := utils.SanitizeLogInput(uacInfo.CaseID)
 
-	caseID := strings.ReplaceAll(uacInfo.CaseID, "\n", "")
-	caseID = strings.ReplaceAll(caseID, "\r", "")
-
-	auth.Logger.Info(fmt.Sprintf("Successful auth with questionnaire: %s", instrumentName),
+	auth.logger().Info(fmt.Sprintf("Successful auth with questionnaire: %s, case ID: %s", instrumentName, caseID),
 		append(utils.GetRequestSource(context),
 			zap.String("InstrumentName", instrumentName),
 			zap.String("CaseID", caseID),
@@ -200,17 +213,18 @@ func (auth *Auth) Logout(context *gin.Context, session sessions.Session) {
 	session.Set(JWT_TOKEN_KEY, "")
 	session.Clear()
 	session.Options(sessions.Options{MaxAge: -1})
-	err := session.Save()
-	if err != nil || auth.clearSessionValidation(context) != nil {
-		auth.notAuth(context)
+	saveErr := session.Save()
+	clearErr := auth.clearSessionValidation(context)
+	if saveErr != nil || clearErr != nil {
+		auth.notAuthed(context)
 		return
 	}
 	context.HTML(http.StatusOK, "logout.tmpl", gin.H{"welsh": auth.LanguageManager.IsWelsh(context)})
 }
 
-func (auth *Auth) notAuth(context *gin.Context) {
+func (auth *Auth) notAuthed(context *gin.Context) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
-		"uac16":      auth.isUac16(),
+		"uac16":      auth.isUAC16(),
 		"csrf_token": auth.CSRFManager.GetToken(context),
 		"welsh":      auth.LanguageManager.IsWelsh(context),
 	})
@@ -220,7 +234,7 @@ func (auth *Auth) notAuth(context *gin.Context) {
 func (auth *Auth) NotAuthWithError(context *gin.Context, errorMessage string) {
 	context.HTML(http.StatusUnauthorized, "login.tmpl", gin.H{
 		"error":      errorMessage,
-		"uac16":      auth.isUac16(),
+		"uac16":      auth.isUAC16(),
 		"csrf_token": auth.CSRFManager.GetToken(context),
 		"welsh":      auth.LanguageManager.IsWelsh(context),
 	})
@@ -233,26 +247,27 @@ func (auth *Auth) InstrumentNotInstalledError(context *gin.Context) {
 }
 
 func (auth *Auth) RefreshToken(context *gin.Context, session sessions.Session, claim *UACClaims) {
-	jwtToken := session.Get(JWT_TOKEN_KEY)
-	if jwtToken == nil || jwtToken.(string) == "" ||
+	jwtTokenValue := session.Get(JWT_TOKEN_KEY)
+	jwtToken, tokenTypeOk := jwtTokenValue.(string)
+	if jwtTokenValue == nil || !tokenTypeOk || jwtToken == "" ||
 		!auth.SessionValid(context) {
-		auth.Logger.Info("Not refreshing JWT as it looks like the user has logged out",
+		auth.logger().Info("Not refreshing JWT as it looks like the user has logged out",
 			append(utils.GetRequestSource(context),
-				zap.String("InstrumentName", claim.UacInfo.InstrumentName),
-				zap.String("CaseID", claim.UacInfo.InstrumentName),
+				zap.String("InstrumentName", claim.UACInfo.InstrumentName),
+				zap.String("CaseIDFingerprint", CaseIDFingerprint(claim.UACInfo.CaseID)),
 			)...)
 		return
 	}
 
-	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UacInfo, claim.AuthTimeout)
+	signedToken, err := auth.JWTCrypto.EncryptJWT(claim.UAC, &claim.UACInfo, claim.AuthTimeout)
 	if err != nil {
-		auth.Logger.Error("Failed to Encrypt JWT", zap.Error(err))
+		auth.logger().Error("Failed to encrypt JWT", zap.Error(err))
 		return
 	}
 
 	session.Set(JWT_TOKEN_KEY, signedToken)
 	if err := session.Save(); err != nil {
-		auth.Logger.Error("Failed to save JWT to session", zap.Error(err))
+		auth.logger().Error("Failed to save JWT to session", zap.Error(err))
 		return
 	}
 }
@@ -263,7 +278,12 @@ func (auth *Auth) SessionValid(context *gin.Context) bool {
 	if sessionValid == nil {
 		return false
 	}
-	return sessionValid.(bool)
+	sessionValidBool, ok := sessionValid.(bool)
+	if !ok {
+		return false
+	}
+
+	return sessionValidBool
 }
 
 func (auth *Auth) clearSessionValidation(context *gin.Context) error {
@@ -274,18 +294,18 @@ func (auth *Auth) clearSessionValidation(context *gin.Context) error {
 	return validationSession.Save()
 }
 
-func (auth *Auth) isUac16() bool {
-	return auth.UacKind == "uac16"
+func (auth *Auth) isUAC16() bool {
+	return auth.UACKind == "uac16"
 }
 
 func (auth *Auth) uacError(context *gin.Context) string {
 	if auth.LanguageManager.IsWelsh(context) {
-		if auth.isUac16() {
+		if auth.isUAC16() {
 			return fmt.Sprintf(INVALID_LENGTH_ERR["welsh"], "16 o nodau")
 		}
 		return fmt.Sprintf(INVALID_LENGTH_ERR["welsh"], "12 o nodau")
 	}
-	if auth.isUac16() {
+	if auth.isUAC16() {
 		return fmt.Sprintf(INVALID_LENGTH_ERR["english"], "16-character")
 	}
 	return fmt.Sprintf(INVALID_LENGTH_ERR["english"], "12-digit")

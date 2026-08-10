@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"testing"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	mockauth "github.com/ONSdigital/blaise-cawi-portal/authenticate/mocks"
@@ -14,747 +15,742 @@ import (
 	mockrestapi "github.com/ONSdigital/blaise-cawi-portal/blaiserestapi/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi/mocks"
+	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	languageManagerMocks "github.com/ONSdigital/blaise-cawi-portal/languagemanager/mocks"
 	"github.com/ONSdigital/blaise-cawi-portal/webserver"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
-	csrf "github.com/srbry/gin-csrf"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Login", func() {
-	var (
+type loginHarness struct {
+	auth           *authenticate.Auth
+	router         *gin.Engine
+	session        sessions.Session
+	logs           *observer.ObservedLogs
+	languageMock   *languageManagerMocks.LanguageManagerInterface
+	csrfManager    *csrf.DefaultCSRFManager
+	jwtCrypto      *authenticate.JWTCrypto
+	observedLogger *zap.Logger
+}
+
+func newLoginHarness(t *testing.T, welsh bool) *loginHarness {
+	t.Helper()
+
+	var observedZapCore zapcore.Core
+	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
+	observedLogger := zap.New(observedZapCore)
+
+	languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+	languageManagerMock.On("IsWelsh", mock.Anything).Return(welsh)
+	languageManagerMock.On("LanguageError", authenticate.NOT_RECOGNISED_ERR, mock.Anything).Return("Access code not recognised. Enter the code again")
+	languageManagerMock.On("LanguageError", authenticate.INTERNAL_SERVER_ERR, mock.Anything).Return("We were unable to process your request, please try again")
+
+	jwtCrypto := &authenticate.JWTCrypto{JWTSecret: "hello"}
+	csrfManager := &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"}
+	auth := &authenticate.Auth{
+		JWTCrypto:       jwtCrypto,
+		Logger:          observedLogger,
+		CSRFManager:     csrfManager,
+		LanguageManager: languageManagerMock,
+	}
+
+	router := gin.Default()
+	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
+	router.LoadHTMLGlob("../templates/*")
+	store := cookie.NewStore([]byte("secret"))
+	router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+
+	h := &loginHarness{
+		auth:           auth,
+		router:         router,
+		logs:           observedLogs,
+		languageMock:   languageManagerMock,
+		csrfManager:    csrfManager,
+		jwtCrypto:      jwtCrypto,
+		observedLogger: observedLogger,
+	}
+
+	router.POST("/login", func(c *gin.Context) {
+		h.session = sessions.DefaultMany(c, "user_session")
+		h.auth.Login(c, h.session)
+	})
+
+	return h
+}
+
+func (h *loginHarness) postLogin(t *testing.T, uacValue, remoteAddr string) *httptest.ResponseRecorder {
+	t.Helper()
+
+	recorder := httptest.NewRecorder()
+	data := url.Values{"uac": []string{uacValue}}
+	req, err := http.NewRequest(http.MethodPost, "/login", strings.NewReader(data.Encode()))
+	require.NoError(t, err)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	if remoteAddr != "" {
+		req.RemoteAddr = remoteAddr
+	}
+
+	h.router.ServeHTTP(recorder, req)
+	return recorder
+}
+
+func TestLogin(t *testing.T) {
+	const (
 		shortUAC    = "22222"
 		longUAC     = "11112222333344445555"
 		spacedUAC   = "1234 5678 9012"
 		spacedUAC16 = "bcdf 5678 ghjk 2345"
 		validUAC    = "123456789012"
 		validUAC16  = "bcdf5678ghjk2345"
-		jwtCrypto   = &authenticate.JWTCrypto{
-			JWTSecret: "hello",
-		}
-		languageManagerMock *languageManagerMocks.LanguageManagerInterface
-		auth                *authenticate.Auth
-		httpRouter          *gin.Engine
-		httpRecorder        *httptest.ResponseRecorder
-		session             sessions.Session
-		observedLogs        *observer.ObservedLogs
-		observedZapCore     zapcore.Core
-		csrfManager         = &csrf.DefaultCSRFManager{
-			Secret:      "fwibble",
-			SessionName: "session",
-		}
 	)
 
-	BeforeEach(func() {
-		observedZapCore, observedLogs = observer.New(zap.InfoLevel)
-		observedLogger := zap.New(observedZapCore)
-		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
-		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-		languageManagerMock.On("LanguageError", mock.Anything, mock.Anything).Return("Access code not recognised. Enter the code again")
-		auth = &authenticate.Auth{
-			JWTCrypto:       jwtCrypto,
-			Logger:          observedLogger,
-			CSRFManager:     csrfManager,
-			LanguageManager: languageManagerMock,
-		}
-		httpRouter = gin.Default()
-		httpRouter.SetFuncMap(template.FuncMap{
-			"WrapWelsh": webserver.WrapWelsh,
-		})
-		httpRouter.LoadHTMLGlob("../templates/*")
-		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
-		httpRouter.POST("/login", func(context *gin.Context) {
-			session = sessions.DefaultMany(context, "user_session")
-			auth.Login(context, session)
-		})
+	t.Run("when instrument is not installed", func(t *testing.T) {
+		h := newLoginHarness(t, false)
+		h.auth.UACKind = "uac"
+
+		mockBusAPI := &mocks.BUSAPIInterface{}
+		mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+		h.auth.BUSAPI = mockBusAPI
+
+		mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
+		mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, blaiserestapi.InstrumentNotFoundError)
+		h.auth.BlaiseRestAPI = mockRestAPI
+
+		recorder := h.postLogin(t, validUAC, "")
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		body := recorder.Body.String()
+		assert.Contains(t, body, "The study is currently unavailable")
+		assert.Contains(t, body, "Please try again later or contact our Survey Enquiry Line on 0800 085 7376 for help.")
+		assert.Contains(t, body, "Any answers you have provided in previous sessions have been logged securely and confidentially. They will only be used for the purposes of this research.")
+
+		require.Equal(t, 1, h.logs.Len())
+		entry := h.logs.All()[0]
+		assert.Equal(t, "Failed auth", entry.Message)
+		assert.Equal(t, "Instrument not installed", entry.ContextMap()["Reason"])
+		assert.Equal(t, "This can happen if a UAC for a non-Blaise 5 survey has been entered", entry.ContextMap()["Notes"])
+		assert.Equal(t, "foo", entry.ContextMap()["InstrumentName"])
+		assert.Equal(t, "fcde2b2edba5", entry.ContextMap()["CaseIDFingerprint"])
+		assert.Equal(t, zap.WarnLevel, entry.Level)
 	})
 
-	Context("When an instrument is not installed", func() {
-		var uacValue string
+	t.Run("when instrument settings does not error", func(t *testing.T) {
+		t.Run("correct length but invalid UAC", func(t *testing.T) {
+			h := newLoginHarness(t, false)
+			h.auth.UACKind = "uac"
 
-		JustBeforeEach(func() {
-			httpRecorder = httptest.NewRecorder()
-			data := url.Values{
-				"uac": []string{uacValue},
-			}
-			req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-			httpRouter.ServeHTTP(httpRecorder, req)
+			mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
+			mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+			h.auth.BlaiseRestAPI = mockRestAPI
+
+			mockBusAPI := &mocks.BUSAPIInterface{}
+			mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{InstrumentName: "", CaseID: "bar"}, nil)
+			h.auth.BUSAPI = mockBusAPI
+
+			recorder := h.postLogin(t, validUAC, "1.1.1.1")
+			assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+			assert.NotEmpty(t, recorder.Result().Cookies())
+			assert.Nil(t, h.session.Get(authenticate.JWT_TOKEN_KEY))
+			assert.Contains(t, recorder.Body.String(), "Access code not recognised. Enter the code again")
+
+			require.Equal(t, 1, h.logs.Len())
+			entry := h.logs.All()[0]
+			assert.Equal(t, "Failed auth", entry.Message)
+			assert.Equal(t, "1.1.1.1", entry.ContextMap()["SourceIP"])
+			assert.Equal(t, "Access code not recognised", entry.ContextMap()["Reason"])
+			assert.Equal(t, "", entry.ContextMap()["InstrumentName"])
+			assert.Equal(t, "fcde2b2edba5", entry.ContextMap()["CaseIDFingerprint"])
+			assert.Nil(t, entry.ContextMap()["error"])
+			assert.Equal(t, zap.InfoLevel, entry.Level)
 		})
 
-		BeforeEach(func() {
-			uacValue = validUAC
-			auth.UacKind = "uac"
-			mockBusApi := &mocks.BusApiInterface{}
-			auth.BusApi = mockBusApi
+		t.Run("correct length but BUS API errors", func(t *testing.T) {
+			h := newLoginHarness(t, false)
+			h.auth.UACKind = "uac"
 
-			mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+			mockBusAPI := &mocks.BUSAPIInterface{}
+			mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{}, fmt.Errorf("bus unavailable"))
+			h.auth.BUSAPI = mockBusAPI
 
-			mockRestApi := &mockrestapi.BlaiseRestApiInterface{}
-			auth.BlaiseRestApi = mockRestApi
-			mockRestApi.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, blaiserestapi.InstrumentNotFoundError)
+			recorder := h.postLogin(t, validUAC, "1.1.1.1")
+			assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+			assert.NotEmpty(t, recorder.Result().Cookies())
+			assert.Nil(t, h.session.Get(authenticate.JWT_TOKEN_KEY))
+			assert.Contains(t, recorder.Body.String(), "We were unable to process your request, please try again")
+
+			require.Equal(t, 1, h.logs.Len())
+			entry := h.logs.All()[0]
+			assert.Equal(t, "Failed auth", entry.Message)
+			assert.Equal(t, "1.1.1.1", entry.ContextMap()["SourceIP"])
+			assert.Equal(t, "Error retrieving UAC information", entry.ContextMap()["Reason"])
+			assert.Equal(t, "", entry.ContextMap()["InstrumentName"])
+			assert.Equal(t, "unknown", entry.ContextMap()["CaseIDFingerprint"])
+			assert.Equal(t, "bus unavailable", entry.ContextMap()["error"])
+			assert.Equal(t, zap.ErrorLevel, entry.Level)
 		})
 
-		It("returns the not live page", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			body := httpRecorder.Body.Bytes()
-			Expect(strings.Contains(string(body), `The study is currently unavailable`)).To(BeTrue())
-			Expect(strings.Contains(string(body), `Please try again later or contact our Survey Enquiry Line on 0800 085 7376 for help.`)).To(BeTrue())
-			Expect(strings.Contains(string(body), `Any answers you have provided in previous sessions have been logged securely and confidentially. They will only be used for the purposes of this research.`)).To(BeTrue())
-		})
+		t.Run("valid UAC code", func(t *testing.T) {
+			t.Run("12 digit UAC", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac"
 
-		It("logs a warning", func() {
-			Expect(observedLogs.Len()).To(Equal(1))
-			Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
-			Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Instrument not installed"))
-			Expect(observedLogs.All()[0].ContextMap()["Notes"]).To(Equal("This can happen if a UAC for a non-Blaise 5 survey has been entered"))
-			Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal("foo"))
-			Expect(observedLogs.All()[0].ContextMap()["CaseID"]).To(Equal("bar"))
-			Expect(observedLogs.All()[0].Level).To(Equal(zap.WarnLevel))
-		})
-	})
+				mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
+				mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+				h.auth.BlaiseRestAPI = mockRestAPI
 
-	Context("When instrument settings does not error", func() {
-		BeforeEach(func() {
-			mockRestApi := &mockrestapi.BlaiseRestApiInterface{}
-			auth.BlaiseRestApi = mockRestApi
-			mockRestApi.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
-		})
+				mockBusAPI := &mocks.BUSAPIInterface{}
+				mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+				h.auth.BUSAPI = mockBusAPI
 
-		Context("Login with a correct length, invalid UAC Code", func() {
-			var uacValue string
+				recorder := h.postLogin(t, validUAC, "")
+				assert.Equal(t, http.StatusFound, recorder.Code)
+				assert.Equal(t, []string{"/foo/"}, recorder.Header()["Location"])
+				assert.NotEmpty(t, recorder.Result().Cookies())
 
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				data := url.Values{
-					"uac": []string{uacValue},
-				}
-				req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				req.RemoteAddr = "1.1.1.1"
-				httpRouter.ServeHTTP(httpRecorder, req)
+				decryptedToken, err := h.auth.JWTCrypto.DecryptJWT(h.session.Get(authenticate.JWT_TOKEN_KEY))
+				require.NoError(t, err)
+				require.NotNil(t, decryptedToken)
+				assert.Equal(t, validUAC, decryptedToken.UAC)
+				assert.Equal(t, "foo", decryptedToken.UACInfo.InstrumentName)
+				assert.Equal(t, "bar", decryptedToken.UACInfo.CaseID)
+				assert.Equal(t, 15, h.session.Get(authenticate.SESSION_TIMEOUT_KEY).(int))
 			})
 
-			BeforeEach(func() {
-				uacValue = validUAC
-				auth.UacKind = "uac"
-				mockBusApi := &mocks.BusApiInterface{}
-				auth.BusApi = mockBusApi
+			t.Run("16 character UAC", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac16"
 
-				mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "", CaseID: "bar"}, nil)
-			})
+				mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
+				mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+				h.auth.BlaiseRestAPI = mockRestAPI
 
-			It("returns a status unauthorised with an error", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-				Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-				Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
-				body := httpRecorder.Body.Bytes()
-				Expect(string(body)).To(ContainSubstring(`Access code not recognised. Enter the code again`))
+				mockBusAPI := &mocks.BUSAPIInterface{}
+				mockBusAPI.On("GetUACInfo", validUAC16).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+				h.auth.BUSAPI = mockBusAPI
 
-				Expect(observedLogs.Len()).To(Equal(1))
-				Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
-				Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
-				Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Access code not recognised"))
-				Expect(observedLogs.All()[0].ContextMap()["InstrumentName"]).To(Equal(""))
-				Expect(observedLogs.All()[0].ContextMap()["CaseID"]).To(Equal("bar"))
-				Expect(observedLogs.All()[0].ContextMap()["error"]).To(BeNil())
-				Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
-			})
-		})
+				recorder := h.postLogin(t, validUAC16, "")
+				assert.Equal(t, http.StatusFound, recorder.Code)
+				assert.Equal(t, []string{"/foo/"}, recorder.Header()["Location"])
+				assert.NotEmpty(t, recorder.Result().Cookies())
 
-		Context("Login with a valid UAC Code", func() {
-			var uacValue string
-
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				data := url.Values{
-					"uac": []string{uacValue},
-				}
-				req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			Context("Login with a 12 digit UAC kind", func() {
-				BeforeEach(func() {
-					uacValue = validUAC
-					auth.UacKind = "uac"
-					mockBusApi := &mocks.BusApiInterface{}
-					auth.BusApi = mockBusApi
-
-					mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
-				})
-
-				It("redirects to /:instrumentName/", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusFound))
-					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-					Expect(decryptedToken.UAC).To(Equal(validUAC))
-					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
-					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
-					Expect(session.Get(authenticate.SESSION_TIMEOUT_KEY).(int)).To(Equal(15))
-				})
-			})
-
-			Context("Login with a 16 character UAC kind", func() {
-				BeforeEach(func() {
-					uacValue = validUAC16
-					auth.UacKind = "uac16"
-					mockBusApi := &mocks.BusApiInterface{}
-					auth.BusApi = mockBusApi
-
-					mockBusApi.On("GetUacInfo", validUAC16).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
-				})
-
-				It("redirects to /:instrumentName/", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusFound))
-					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-					Expect(decryptedToken.UAC).To(Equal(validUAC16))
-					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
-					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
-					Expect(session.Get(authenticate.SESSION_TIMEOUT_KEY).(int)).To(Equal(15))
-				})
-			})
-
-		})
-
-		Context("Login with a valid UAC Code containing whitespace", func() {
-			var uacValue string
-
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				data := url.Values{
-					"uac": []string{uacValue},
-				}
-				req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			Context("Login with a 12 digit UAC kind", func() {
-				BeforeEach(func() {
-					uacValue = spacedUAC
-					auth.UacKind = "uac"
-					mockBusApi := &mocks.BusApiInterface{}
-					auth.BusApi = mockBusApi
-
-					mockBusApi.On("GetUacInfo", validUAC).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
-				})
-
-				It("redirects to /:instrumentName/", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusFound))
-					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-					Expect(decryptedToken.UAC).To(Equal(validUAC))
-					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
-					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
-
-					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(ContainSubstring("Successful auth with questionnaire: foo"))
-				})
-			})
-
-			Context("Login with a 16 character UAC kind", func() {
-				BeforeEach(func() {
-					uacValue = spacedUAC16
-					auth.UacKind = "uac16"
-					mockBusApi := &mocks.BusApiInterface{}
-					auth.BusApi = mockBusApi
-
-					mockBusApi.On("GetUacInfo", validUAC16).Once().Return(busapi.UacInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
-				})
-
-				It("redirects to /:instrumentName/", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusFound))
-					Expect(httpRecorder.Header()["Location"]).To(Equal([]string{"/foo/"}))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					decryptedToken, _ := auth.JWTCrypto.DecryptJWT(session.Get(authenticate.JWT_TOKEN_KEY))
-					Expect(decryptedToken.UAC).To(Equal(validUAC16))
-					Expect(decryptedToken.UacInfo.InstrumentName).To(Equal("foo"))
-					Expect(decryptedToken.UacInfo.CaseID).To(Equal("bar"))
-				})
+				decryptedToken, err := h.auth.JWTCrypto.DecryptJWT(h.session.Get(authenticate.JWT_TOKEN_KEY))
+				require.NoError(t, err)
+				require.NotNil(t, decryptedToken)
+				assert.Equal(t, validUAC16, decryptedToken.UAC)
+				assert.Equal(t, "foo", decryptedToken.UACInfo.InstrumentName)
+				assert.Equal(t, "bar", decryptedToken.UACInfo.CaseID)
+				assert.Equal(t, 15, h.session.Get(authenticate.SESSION_TIMEOUT_KEY).(int))
 			})
 		})
 
-		Context("Login with a short UAC Code", func() {
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				data := url.Values{
-					"uac": []string{shortUAC},
-				}
-				req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				httpRouter.ServeHTTP(httpRecorder, req)
+		t.Run("valid UAC code containing whitespace", func(t *testing.T) {
+			t.Run("12 digit UAC", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac"
+
+				mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
+				mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+				h.auth.BlaiseRestAPI = mockRestAPI
+
+				mockBusAPI := &mocks.BUSAPIInterface{}
+				mockBusAPI.On("GetUACInfo", validUAC).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+				h.auth.BUSAPI = mockBusAPI
+
+				recorder := h.postLogin(t, spacedUAC, "")
+				assert.Equal(t, http.StatusFound, recorder.Code)
+				assert.Equal(t, []string{"/foo/"}, recorder.Header()["Location"])
+				assert.NotEmpty(t, recorder.Result().Cookies())
+
+				decryptedToken, err := h.auth.JWTCrypto.DecryptJWT(h.session.Get(authenticate.JWT_TOKEN_KEY))
+				require.NoError(t, err)
+				require.NotNil(t, decryptedToken)
+				assert.Equal(t, validUAC, decryptedToken.UAC)
+				assert.Equal(t, "foo", decryptedToken.UACInfo.InstrumentName)
+				assert.Equal(t, "bar", decryptedToken.UACInfo.CaseID)
+
+				require.Equal(t, 1, h.logs.Len())
+				assert.Equal(t, "Successful auth with questionnaire: foo, case ID: bar", h.logs.All()[0].Message)
+				assert.NotContains(t, h.logs.All()[0].Message, validUAC)
+				assert.NotContains(t, fmt.Sprint(h.logs.All()[0].ContextMap()), validUAC)
 			})
 
-			Context("Login with a 12 digit UAC kind", func() {
-				BeforeEach(func() {
-					auth.UacKind = "uac"
-				})
+			t.Run("16 character UAC", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac16"
 
-				It("returns a status unauthorised with an error", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `Enter your 12-digit access code`)).To(BeTrue())
-				})
-			})
+				mockRestAPI := &mockrestapi.BlaiseRestAPIInterface{}
+				mockRestAPI.On("GetInstrumentSettings", mock.Anything).Return(blaiserestapi.InstrumentSettings{}, nil)
+				h.auth.BlaiseRestAPI = mockRestAPI
 
-			Context("Login with a 16 character UAC kind", func() {
-				BeforeEach(func() {
-					auth.UacKind = "uac16"
-				})
+				mockBusAPI := &mocks.BUSAPIInterface{}
+				mockBusAPI.On("GetUACInfo", validUAC16).Once().Return(busapi.UACInfo{InstrumentName: "foo", CaseID: "bar"}, nil)
+				h.auth.BUSAPI = mockBusAPI
 
-				It("returns a status unauthorised with an error", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `Enter your 16-character access code`)).To(BeTrue())
-				})
-			})
-		})
+				recorder := h.postLogin(t, spacedUAC16, "")
+				assert.Equal(t, http.StatusFound, recorder.Code)
+				assert.Equal(t, []string{"/foo/"}, recorder.Header()["Location"])
+				assert.NotEmpty(t, recorder.Result().Cookies())
 
-		Context("Login with a long UAC Code", func() {
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				data := url.Values{
-					"uac": []string{longUAC},
-				}
-				req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				req.RemoteAddr = "1.1.1.1"
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			Context("Login with a 12 digit UAC kind", func() {
-				BeforeEach(func() {
-					auth.UacKind = "uac"
-				})
-
-				It("returns a status unauthorised with an error", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `Enter your 12-digit access code`)).To(BeTrue())
-
-					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
-					Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
-					Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Invalid UAC length"))
-					Expect(observedLogs.All()[0].ContextMap()["UACLength"]).To(Equal(int64(12)))
-					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
-				})
-			})
-
-			Context("Login with a 16 character UAC kind", func() {
-				BeforeEach(func() {
-					auth.UacKind = "uac16"
-				})
-
-				It("returns a status unauthorised with an error", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `Enter your 16-character access code`)).To(BeTrue())
-
-					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
-					Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
-					Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Invalid UAC length"))
-					Expect(observedLogs.All()[0].ContextMap()["UACLength"]).To(Equal(int64(16)))
-					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
-				})
+				decryptedToken, err := h.auth.JWTCrypto.DecryptJWT(h.session.Get(authenticate.JWT_TOKEN_KEY))
+				require.NoError(t, err)
+				require.NotNil(t, decryptedToken)
+				assert.Equal(t, validUAC16, decryptedToken.UAC)
+				assert.Equal(t, "foo", decryptedToken.UACInfo.InstrumentName)
+				assert.Equal(t, "bar", decryptedToken.UACInfo.CaseID)
 			})
 		})
 
-		Context("Login with no UAC Code", func() {
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				data := url.Values{
-					"uac": []string{},
-				}
-				req, _ := http.NewRequest("POST", "/login", strings.NewReader(data.Encode()))
-				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-				req.RemoteAddr = "1.1.1.1"
-				httpRouter.ServeHTTP(httpRecorder, req)
+		t.Run("short UAC code", func(t *testing.T) {
+			t.Run("12 digit mode", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac"
+				recorder := h.postLogin(t, shortUAC, "")
+				assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+				assert.NotEmpty(t, recorder.Result().Cookies())
+				assert.Nil(t, h.session.Get(authenticate.JWT_TOKEN_KEY))
+				assert.Contains(t, recorder.Body.String(), "Enter your 12-digit access code")
 			})
 
-			Context("Login with a 12 digit UAC kind", func() {
-				BeforeEach(func() {
-					auth.UacKind = "uac"
-				})
+			t.Run("16 character mode", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac16"
+				recorder := h.postLogin(t, shortUAC, "")
+				assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+				assert.NotEmpty(t, recorder.Result().Cookies())
+				assert.Nil(t, h.session.Get(authenticate.JWT_TOKEN_KEY))
+				assert.Contains(t, recorder.Body.String(), "Enter your 16-character access code")
+			})
+		})
 
-				It("returns a status unauthorised with an error", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `Enter your 12-digit access code`)).To(BeTrue())
+		t.Run("long UAC code", func(t *testing.T) {
+			t.Run("12 digit mode", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac"
+				recorder := h.postLogin(t, longUAC, "1.1.1.1")
+				assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+				assert.NotEmpty(t, recorder.Result().Cookies())
+				assert.Nil(t, h.session.Get(authenticate.JWT_TOKEN_KEY))
+				assert.Contains(t, recorder.Body.String(), "Enter your 12-digit access code")
 
-					Expect(observedLogs.Len()).To(Equal(1))
-					Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
-					Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
-					Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Blank UAC"))
-					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
-				})
+				require.Equal(t, 1, h.logs.Len())
+				entry := h.logs.All()[0]
+				assert.Equal(t, "Failed auth", entry.Message)
+				assert.Equal(t, "1.1.1.1", entry.ContextMap()["SourceIP"])
+				assert.Equal(t, "Invalid UAC length", entry.ContextMap()["Reason"])
+				assert.Equal(t, int64(12), entry.ContextMap()["UACLength"])
+				assert.Equal(t, zap.InfoLevel, entry.Level)
 			})
 
-			Context("Login with a 16 character UAC kind", func() {
-				BeforeEach(func() {
-					auth.UacKind = "uac16"
-				})
+			t.Run("16 character mode", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac16"
+				recorder := h.postLogin(t, longUAC, "1.1.1.1")
+				assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+				assert.NotEmpty(t, recorder.Result().Cookies())
+				assert.Nil(t, h.session.Get(authenticate.JWT_TOKEN_KEY))
+				assert.Contains(t, recorder.Body.String(), "Enter your 16-character access code")
 
-				It("returns a status unauthorised with an error", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-					Expect(httpRecorder.Result().Cookies()).ToNot(BeEmpty())
-					Expect(session.Get(authenticate.JWT_TOKEN_KEY)).To(BeNil())
-					body := httpRecorder.Body.Bytes()
-					Expect(strings.Contains(string(body), `Enter your 16-character access code`)).To(BeTrue())
-					Expect(observedLogs.Len()).To(Equal(1))
+				require.Equal(t, 1, h.logs.Len())
+				entry := h.logs.All()[0]
+				assert.Equal(t, "Failed auth", entry.Message)
+				assert.Equal(t, "1.1.1.1", entry.ContextMap()["SourceIP"])
+				assert.Equal(t, "Invalid UAC length", entry.ContextMap()["Reason"])
+				assert.Equal(t, int64(16), entry.ContextMap()["UACLength"])
+				assert.Equal(t, zap.InfoLevel, entry.Level)
+			})
+		})
 
-					Expect(observedLogs.All()[0].Message).To(Equal("Failed auth"))
-					Expect(observedLogs.All()[0].ContextMap()["SourceIP"]).To(Equal("1.1.1.1"))
-					Expect(observedLogs.All()[0].ContextMap()["Reason"]).To(Equal("Blank UAC"))
-					Expect(observedLogs.All()[0].Level).To(Equal(zap.InfoLevel))
-				})
+		t.Run("blank UAC code", func(t *testing.T) {
+			t.Run("12 digit mode", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac"
+				recorder := h.postLogin(t, "", "1.1.1.1")
+				assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+				assert.NotEmpty(t, recorder.Result().Cookies())
+				assert.Nil(t, h.session.Get(authenticate.JWT_TOKEN_KEY))
+				assert.Contains(t, recorder.Body.String(), "Enter your 12-digit access code")
+
+				require.Equal(t, 1, h.logs.Len())
+				entry := h.logs.All()[0]
+				assert.Equal(t, "Failed auth", entry.Message)
+				assert.Equal(t, "1.1.1.1", entry.ContextMap()["SourceIP"])
+				assert.Equal(t, "Blank UAC", entry.ContextMap()["Reason"])
+				assert.Equal(t, zap.InfoLevel, entry.Level)
+			})
+
+			t.Run("16 character mode", func(t *testing.T) {
+				h := newLoginHarness(t, false)
+				h.auth.UACKind = "uac16"
+				recorder := h.postLogin(t, "", "1.1.1.1")
+				assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+				assert.NotEmpty(t, recorder.Result().Cookies())
+				assert.Nil(t, h.session.Get(authenticate.JWT_TOKEN_KEY))
+				assert.Contains(t, recorder.Body.String(), "Enter your 16-character access code")
+
+				require.Equal(t, 1, h.logs.Len())
+				entry := h.logs.All()[0]
+				assert.Equal(t, "Failed auth", entry.Message)
+				assert.Equal(t, "1.1.1.1", entry.ContextMap()["SourceIP"])
+				assert.Equal(t, "Blank UAC", entry.ContextMap()["Reason"])
+				assert.Equal(t, zap.InfoLevel, entry.Level)
 			})
 		})
 	})
+}
 
-	var _ = Describe("Logout", func() {
-		var (
-			httpRouter   *gin.Engine
-			httpRecorder *httptest.ResponseRecorder
-			session      sessions.Session
-			csrfManager  = &csrf.DefaultCSRFManager{
-				Secret:      "fwibble",
-				SessionName: "session",
-			}
-			languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
-			auth                = &authenticate.Auth{CSRFManager: csrfManager, LanguageManager: languageManagerMock}
-		)
+func TestLogout(t *testing.T) {
+	languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+	languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+	auth := &authenticate.Auth{
+		CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"},
+		LanguageManager: languageManagerMock,
+	}
 
-		BeforeEach(func() {
-			languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-			httpRouter = gin.Default()
-			httpRouter.SetFuncMap(template.FuncMap{
-				"WrapWelsh": webserver.WrapWelsh,
-			})
-			httpRouter.LoadHTMLGlob("../templates/*")
-			store := cookie.NewStore([]byte("secret"))
-			httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
-			httpRouter.GET("/logout", func(context *gin.Context) {
-				session = sessions.DefaultMany(context, "user_session")
-				session.Set("foobar", "fizzbuzz")
-				_ = session.Save()
-				Expect(session.Get("foobar")).ToNot(BeNil())
-				auth.Logout(context, session)
-			})
-		})
+	router := gin.Default()
+	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
+	router.LoadHTMLGlob("../templates/*")
+	store := cookie.NewStore([]byte("secret"))
+	router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation"}, store))
 
-		Context("Logout of a session", func() {
-			JustBeforeEach(func() {
-				httpRecorder = httptest.NewRecorder()
-				req, _ := http.NewRequest("GET", "/logout", nil)
-				httpRouter.ServeHTTP(httpRecorder, req)
-			})
-
-			It("Clears the current session and renders the log out confirmation page", func() {
-				Expect(session.Get("foobar")).To(BeNil())
-				Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-				body := httpRecorder.Body.Bytes()
-				Expect(strings.Contains(string(body), `<h1>Your progress has been saved</h1>`)).To(BeTrue())
-			})
-		})
-	})
-})
-
-var _ = Describe("AuthenticatedWithUac", func() {
-	var (
-		session sessions.Session
-
-		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
-		csrfManager   = &csrf.DefaultCSRFManager{
-			Secret:      "fwibble",
-			SessionName: "session",
-		}
-		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
-		auth                = &authenticate.Auth{
-			JWTCrypto:       mockJwtCrypto,
-			CSRFManager:     csrfManager,
-			LanguageManager: languageManagerMock,
-		}
-		httpRecorder *httptest.ResponseRecorder
-		httpRouter   *gin.Engine
-		sessionValid = false
-	)
-
-	BeforeEach(func() {
-		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-		httpRouter = gin.Default()
-		httpRouter.SetFuncMap(template.FuncMap{
-			"WrapWelsh": webserver.WrapWelsh,
-		})
-		httpRouter.LoadHTMLGlob("../templates/*")
-		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+	var session sessions.Session
+	router.GET("/logout", func(c *gin.Context) {
+		session = sessions.DefaultMany(c, "user_session")
+		session.Set("foobar", "fizzbuzz")
+		require.NoError(t, session.Save())
+		require.NotNil(t, session.Get("foobar"))
+		auth.Logout(c, session)
 	})
 
-	AfterEach(func() {
-		httpRouter = gin.Default()
-		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
-		auth.JWTCrypto = mockJwtCrypto
-		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
-		auth.LanguageManager = languageManagerMock
-	})
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/logout", nil)
+	require.NoError(t, err)
+	router.ServeHTTP(recorder, req)
 
-	JustBeforeEach(func() {
-		httpRecorder = httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/", nil)
-		httpRouter.ServeHTTP(httpRecorder, req)
-	})
+	assert.Nil(t, session.Get("foobar"))
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "<h1>Your progress has been saved</h1>")
+}
 
-	Context("when there is a token", func() {
-		BeforeEach(func() {
-			httpRouter.Use(func(context *gin.Context) {
-				session = sessions.DefaultMany(context, "user_session")
-				session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
-				_ = session.Save()
+func newAuthMiddlewareRouter(t *testing.T, authObj *authenticate.Auth, withToken bool, sessionValid bool) (*gin.Engine, *httptest.ResponseRecorder) {
+	t.Helper()
 
-				sessionValidation := sessions.DefaultMany(context, "session_validation")
-				sessionValidation.Set(authenticate.SESSION_VALID_KEY, sessionValid)
-				_ = sessionValidation.Save()
-				context.Next()
-			})
+	router := gin.Default()
+	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
+	router.LoadHTMLGlob("../templates/*")
+	store := cookie.NewStore([]byte("secret"))
+	router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
 
-			httpRouter.Use(auth.AuthenticatedWithUac)
-			httpRouter.GET("/", func(context *gin.Context) {
-				context.JSON(200, true)
-			})
-		})
-
-		Context("When a token can be decrypted", func() {
-			BeforeEach(func() {
-				mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
-			})
-
-			Context("and the session is valid", func() {
-				BeforeEach(func() {
-					sessionValid = true
-				})
-
-				It("Allows the context to continue", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-					body := httpRecorder.Body.Bytes()
-					Expect(string(body)).To(Equal("true"))
-				})
-			})
-
-			Context("and the session is invalid", func() {
-				BeforeEach(func() {
-					sessionValid = false
-				})
-
-				It("returns unauthorized", func() {
-					Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-					body := httpRecorder.Body.Bytes()
-					Expect(string(body)).To(ContainSubstring(`Access study`))
-				})
-			})
-		})
-
-		Context("When a token cannot be decrypted", func() {
-			BeforeEach(func() {
-				mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
-			})
-
-			It("returns unauthorized", func() {
-				Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-				body := httpRecorder.Body.Bytes()
-				Expect(string(body)).To(ContainSubstring(`Access study`))
-			})
-		})
-	})
-
-	Context("When there is no token", func() {
-		BeforeEach(func() {
-			httpRouter.Use(auth.AuthenticatedWithUac)
-			httpRouter.GET("/", func(context *gin.Context) {
-				context.JSON(200, true)
-			})
-		})
-
-		It("returns unauthorized", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusUnauthorized))
-			body := httpRecorder.Body.Bytes()
-			Expect(string(body)).To(ContainSubstring(`Access study`))
-		})
-	})
-})
-
-var _ = Describe("Has Session", func() {
-	var (
-		session sessions.Session
-
-		mockJwtCrypto       = &mockauth.JWTCryptoInterface{}
-		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
-		auth                = &authenticate.Auth{
-			JWTCrypto:       mockJwtCrypto,
-			LanguageManager: languageManagerMock,
-		}
-		httpRecorder   *httptest.ResponseRecorder
-		httpRouter     *gin.Engine
-		instrumentName = "foobar"
-		caseID         = "fizzbuzz"
-		disabled       = false
-	)
-
-	BeforeEach(func() {
-		languageManagerMock = &languageManagerMocks.LanguageManagerInterface{}
-		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-		httpRouter = gin.Default()
-		httpRouter.SetFuncMap(template.FuncMap{
-			"WrapWelsh": webserver.WrapWelsh,
-		})
-		httpRouter.LoadHTMLGlob("../templates/*")
-		store := cookie.NewStore([]byte("secret"))
-		httpRouter.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
-
-		httpRouter.Use(func(context *gin.Context) {
-			session = sessions.DefaultMany(context, "user_session")
+	router.Use(func(c *gin.Context) {
+		if withToken {
+			session := sessions.DefaultMany(c, "user_session")
 			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
-			_ = session.Save()
-			context.Next()
+			require.NoError(t, session.Save())
+
+			validationSession := sessions.DefaultMany(c, "session_validation")
+			validationSession.Set(authenticate.SESSION_VALID_KEY, sessionValid)
+			require.NoError(t, validationSession.Save())
+		}
+		c.Next()
+	})
+
+	router.Use(authObj.AuthenticatedWithUAC)
+	router.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, true)
+	})
+
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	require.NoError(t, err)
+	router.ServeHTTP(recorder, req)
+	return router, recorder
+}
+
+func TestAuthenticatedWithUac(t *testing.T) {
+	newAuth := func(mockJwtCrypto *mockauth.JWTCryptoInterface) *authenticate.Auth {
+		languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+		return &authenticate.Auth{
+			JWTCrypto:       mockJwtCrypto,
+			CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"},
+			LanguageManager: languageManagerMock,
+		}
+	}
+
+	t.Run("token decrypts and session valid", func(t *testing.T) {
+		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
+		authObj := newAuth(mockJwtCrypto)
+		_, recorder := newAuthMiddlewareRouter(t, authObj, true, true)
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.Equal(t, "true", recorder.Body.String())
+	})
+
+	t.Run("token decrypts but session invalid", func(t *testing.T) {
+		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, nil)
+		authObj := newAuth(mockJwtCrypto)
+		_, recorder := newAuthMiddlewareRouter(t, authObj, true, false)
+
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), "Access study")
+	})
+
+	t.Run("token cannot be decrypted", func(t *testing.T) {
+		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
+		authObj := newAuth(mockJwtCrypto)
+		_, recorder := newAuthMiddlewareRouter(t, authObj, true, true)
+
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), "Access study")
+	})
+
+	t.Run("no token", func(t *testing.T) {
+		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		authObj := newAuth(mockJwtCrypto)
+		_, recorder := newAuthMiddlewareRouter(t, authObj, false, false)
+
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), "Access study")
+	})
+}
+
+func TestHasSession(t *testing.T) {
+	runHasSession := func(t *testing.T, claim *authenticate.UACClaims, decryptErr error) *httptest.ResponseRecorder {
+		t.Helper()
+
+		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(claim, decryptErr)
+		languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+
+		authObj := &authenticate.Auth{
+			JWTCrypto:       mockJwtCrypto,
+			LanguageManager: languageManagerMock,
+		}
+
+		router := gin.Default()
+		router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
+		router.LoadHTMLGlob("../templates/*")
+		store := cookie.NewStore([]byte("secret"))
+		router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+
+		router.Use(func(c *gin.Context) {
+			session := sessions.DefaultMany(c, "user_session")
+			session.Set(authenticate.JWT_TOKEN_KEY, "foobar")
+			require.NoError(t, session.Save())
+			c.Next()
 		})
 
-		httpRouter.GET("/", func(context *gin.Context) {
-			hasSession, claim := auth.HasSession(context)
-			context.JSON(200, struct {
+		router.GET("/", func(c *gin.Context) {
+			hasSession, claimResult := authObj.HasSession(c)
+			c.JSON(200, struct {
 				HasSession bool
 				Claim      *authenticate.UACClaims
 			}{
 				HasSession: hasSession,
-				Claim:      claim,
+				Claim:      claimResult,
 			})
 		})
+
+		recorder := httptest.NewRecorder()
+		req, err := http.NewRequest(http.MethodGet, "/", nil)
+		require.NoError(t, err)
+		router.ServeHTTP(recorder, req)
+		return recorder
+	}
+
+	t.Run("returns true and claim", func(t *testing.T) {
+		recorder := runHasSession(t, &authenticate.UACClaims{UACInfo: busapi.UACInfo{InstrumentName: "foobar", CaseID: "fizzbuzz", Disabled: false}}, nil)
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.Equal(t, `{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":false}}`, recorder.Body.String())
 	})
 
-	AfterEach(func() {
-		mockJwtCrypto = &mockauth.JWTCryptoInterface{}
-		auth.JWTCrypto = mockJwtCrypto
+	t.Run("returns disabled true", func(t *testing.T) {
+		recorder := runHasSession(t, &authenticate.UACClaims{UACInfo: busapi.UACInfo{InstrumentName: "foobar", CaseID: "fizzbuzz", Disabled: true}}, nil)
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.Equal(t, `{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":true}}`, recorder.Body.String())
 	})
 
-	JustBeforeEach(func() {
-		httpRecorder = httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/", nil)
-		httpRouter.ServeHTTP(httpRecorder, req)
+	t.Run("returns false and empty claim when decrypt fails", func(t *testing.T) {
+		recorder := runHasSession(t, nil, fmt.Errorf("Explosions"))
+		assert.Equal(t, http.StatusOK, recorder.Code)
+		assert.Equal(t, `{"HasSession":false,"Claim":null}`, recorder.Body.String())
+	})
+}
+
+func TestForbidden(t *testing.T) {
+	router := gin.Default()
+	router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
+	router.LoadHTMLGlob("../templates/*")
+	router.GET("/forbidden", func(c *gin.Context) {
+		authenticate.Forbidden(c, true)
 	})
 
-	Context("When someone has a session", func() {
-		BeforeEach(func() {
-			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
-				UacInfo: busapi.UacInfo{
-					InstrumentName: instrumentName,
-					CaseID:         caseID,
-					Disabled:       disabled,
+	recorder := httptest.NewRecorder()
+	req, err := http.NewRequest(http.MethodGet, "/forbidden", nil)
+	require.NoError(t, err)
+	router.ServeHTTP(recorder, req)
+
+	assert.Equal(t, http.StatusForbidden, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "<html lang=\"cy\">")
+	assert.Contains(t, recorder.Body.String(), "Mae'n ddrwg gennym, mae problem gyda'r gwasanaeth")
+}
+
+func TestRefreshToken(t *testing.T) {
+	runRefresh := func(t *testing.T, initialToken interface{}, sessionValidValue interface{}, setupMock func(*mockauth.JWTCryptoInterface, *authenticate.UACClaims)) (sessions.Session, *httptest.ResponseRecorder, *mockauth.JWTCryptoInterface) {
+		t.Helper()
+
+		mockJwtCrypto := &mockauth.JWTCryptoInterface{}
+		if setupMock != nil {
+			claim := &authenticate.UACClaims{
+				UAC:         "123456789012",
+				AuthTimeout: 15,
+				UACInfo: busapi.UACInfo{
+					InstrumentName: "foo",
+					CaseID:         "bar",
 				},
-			}, nil)
+			}
+			setupMock(mockJwtCrypto, claim)
+		}
+
+		languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+		languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+		authObj := &authenticate.Auth{
+			JWTCrypto:       mockJwtCrypto,
+			Logger:          zap.NewNop(),
+			LanguageManager: languageManagerMock,
+		}
+		claim := &authenticate.UACClaims{
+			UAC:         "123456789012",
+			AuthTimeout: 15,
+			UACInfo: busapi.UACInfo{
+				InstrumentName: "foo",
+				CaseID:         "bar",
+			},
+		}
+
+		router := gin.Default()
+		store := cookie.NewStore([]byte("secret"))
+		router.Use(sessions.SessionsMany([]string{"user_session", "session_validation"}, store))
+
+		var userSession sessions.Session
+		router.GET("/refresh", func(c *gin.Context) {
+			userSession = sessions.DefaultMany(c, "user_session")
+			if initialToken != nil {
+				userSession.Set(authenticate.JWT_TOKEN_KEY, initialToken)
+				require.NoError(t, userSession.Save())
+			}
+
+			validationSession := sessions.DefaultMany(c, "session_validation")
+			validationSession.Set(authenticate.SESSION_VALID_KEY, sessionValidValue)
+			require.NoError(t, validationSession.Save())
+
+			authObj.RefreshToken(c, userSession, claim)
+			c.Status(http.StatusNoContent)
 		})
 
-		It("returns true and a claim", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			body := httpRecorder.Body.Bytes()
-			Expect(string(body)).To(Equal(
-				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":false}}`,
-			))
+		recorder := httptest.NewRecorder()
+		req, err := http.NewRequest(http.MethodGet, "/refresh", nil)
+		require.NoError(t, err)
+		router.ServeHTTP(recorder, req)
+
+		return userSession, recorder, mockJwtCrypto
+	}
+
+	t.Run("refreshes token when existing and session valid", func(t *testing.T) {
+		session, recorder, _ := runRefresh(t, "existing-token", true, func(m *mockauth.JWTCryptoInterface, claim *authenticate.UACClaims) {
+			m.On("EncryptJWT", claim.UAC, &claim.UACInfo, claim.AuthTimeout).Return("refreshed-token", nil).Once()
 		})
+		assert.Equal(t, http.StatusNoContent, recorder.Code)
+		assert.Equal(t, "refreshed-token", session.Get(authenticate.JWT_TOKEN_KEY))
 	})
 
-	Context("When a UAC is disabled", func() {
-		BeforeEach(func() {
-			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
-				UacInfo: busapi.UacInfo{
-					InstrumentName: instrumentName,
-					CaseID:         caseID,
-					Disabled:       true,
-				},
-			}, nil)
-		})
-
-		It("it returns `disabled:true` in the response", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			body := httpRecorder.Body.Bytes()
-			Expect(string(body)).To(Equal(
-				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":true}}`,
-			))
-		})
+	t.Run("does not refresh when no existing token", func(t *testing.T) {
+		_, recorder, mockJwtCrypto := runRefresh(t, nil, true, nil)
+		assert.Equal(t, http.StatusNoContent, recorder.Code)
+		assert.Empty(t, mockJwtCrypto.Calls)
 	})
 
-	Context("When a UAC is enabled", func() {
-		BeforeEach(func() {
-			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
-				UacInfo: busapi.UacInfo{
-					InstrumentName: instrumentName,
-					CaseID:         caseID,
-					Disabled:       false,
-				},
-			}, nil)
-		})
-
-		It("it returns `disabled:false` in the response", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			body := httpRecorder.Body.Bytes()
-			Expect(string(body)).To(Equal(
-				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":false}}`,
-			))
-		})
+	t.Run("does not refresh when session invalid", func(t *testing.T) {
+		session, recorder, mockJwtCrypto := runRefresh(t, "existing-token", false, nil)
+		assert.Equal(t, http.StatusNoContent, recorder.Code)
+		assert.Equal(t, "existing-token", session.Get(authenticate.JWT_TOKEN_KEY))
+		assert.Empty(t, mockJwtCrypto.Calls)
 	})
 
-	Context("When a UAC Disabled field is unset", func() {
-		BeforeEach(func() {
-			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(&authenticate.UACClaims{
-				UacInfo: busapi.UacInfo{
-					InstrumentName: instrumentName,
-					CaseID:         caseID,
-				},
-			}, nil)
+	t.Run("keeps existing token when encryption fails", func(t *testing.T) {
+		session, recorder, _ := runRefresh(t, "existing-token", true, func(m *mockauth.JWTCryptoInterface, claim *authenticate.UACClaims) {
+			m.On("EncryptJWT", claim.UAC, &claim.UACInfo, claim.AuthTimeout).Return("", fmt.Errorf("encrypt failed")).Once()
 		})
-
-		It("it returns `disabled:false` in the response", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			body := httpRecorder.Body.Bytes()
-			Expect(string(body)).To(Equal(
-				`{"HasSession":true,"Claim":{"uac":"","auth_timeout":0,"instrument_name":"foobar","case_id":"fizzbuzz","disabled":false}}`,
-			))
-		})
+		assert.Equal(t, http.StatusNoContent, recorder.Code)
+		assert.Equal(t, "existing-token", session.Get(authenticate.JWT_TOKEN_KEY))
 	})
 
-	Context("When someone doesn't have a session", func() {
-		BeforeEach(func() {
-			mockJwtCrypto.On("DecryptJWT", mock.Anything).Return(nil, fmt.Errorf("Explosions"))
+	t.Run("does not refresh when token has unexpected type", func(t *testing.T) {
+		session, recorder, mockJwtCrypto := runRefresh(t, 123, true, nil)
+		assert.Equal(t, http.StatusNoContent, recorder.Code)
+		assert.Equal(t, 123, session.Get(authenticate.JWT_TOKEN_KEY))
+		assert.Empty(t, mockJwtCrypto.Calls)
+	})
+
+	t.Run("does not refresh when session validation type is unexpected", func(t *testing.T) {
+		session, recorder, mockJwtCrypto := runRefresh(t, "existing-token", "true", nil)
+		assert.Equal(t, http.StatusNoContent, recorder.Code)
+		assert.Equal(t, "existing-token", session.Get(authenticate.JWT_TOKEN_KEY))
+		assert.Empty(t, mockJwtCrypto.Calls)
+	})
+}
+
+func TestLoginWelshValidation(t *testing.T) {
+	runWelshLogin := func(t *testing.T, uacKind string) *httptest.ResponseRecorder {
+		t.Helper()
+
+		languageManagerMock := &languageManagerMocks.LanguageManagerInterface{}
+		languageManagerMock.On("IsWelsh", mock.Anything).Return(true)
+		authObj := &authenticate.Auth{
+			Logger:          zap.NewNop(),
+			CSRFManager:     &csrf.DefaultCSRFManager{Secret: "fwibble", SessionName: "session"},
+			LanguageManager: languageManagerMock,
+			UACKind:         uacKind,
+		}
+
+		router := gin.Default()
+		router.SetFuncMap(template.FuncMap{"WrapWelsh": webserver.WrapWelsh})
+		router.LoadHTMLGlob("../templates/*")
+		store := cookie.NewStore([]byte("secret"))
+		router.Use(sessions.SessionsMany([]string{"session", "user_session", "session_validation", "language_session"}, store))
+		router.POST("/login", func(c *gin.Context) {
+			session := sessions.DefaultMany(c, "user_session")
+			authObj.Login(c, session)
 		})
 
-		It("returns false and an empty claim", func() {
-			Expect(httpRecorder.Code).To(Equal(http.StatusOK))
-			body := httpRecorder.Body.Bytes()
-			Expect(string(body)).To(Equal(`{"HasSession":false,"Claim":null}`))
-		})
+		recorder := httptest.NewRecorder()
+		data := url.Values{"uac": []string{""}}
+		req, err := http.NewRequest(http.MethodPost, "/login", strings.NewReader(data.Encode()))
+		require.NoError(t, err)
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		router.ServeHTTP(recorder, req)
+
+		return recorder
+	}
+
+	t.Run("12-digit mode", func(t *testing.T) {
+		recorder := runWelshLogin(t, "uac")
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), "Rhowch eich cod mynediad sy'n cynnwys 12 o nodau")
 	})
-})
+
+	t.Run("16-character mode", func(t *testing.T) {
+		recorder := runWelshLogin(t, "uac16")
+		assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), "Rhowch eich cod mynediad sy'n cynnwys 16 o nodau")
+	})
+}

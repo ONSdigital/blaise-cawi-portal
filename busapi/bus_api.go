@@ -4,18 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-    "io"
+	"io"
 	"net/http"
 )
 
-//Generate mocks by running "go generate ./..."
-//go:generate mockery --name BusApiInterface
-type BusApiInterface interface {
-	GetUacInfo(string) (UacInfo, error)
+//go:generate mockery --name BUSAPIInterface
+type BUSAPIInterface interface {
+	GetUACInfo(string) (UACInfo, error)
 }
 
-type BusApi struct {
-	BaseUrl string
+type BUSAPI struct {
+	BaseURL string
 	Client  *http.Client
 }
 
@@ -23,54 +22,60 @@ type UACRequest struct {
 	UAC string `json:"uac"`
 }
 
-func (busApi *BusApi) GetUacInfo(uac string) (UacInfo, error) {
-	response, err := busApi.doGetUacInfo(uac)
+func (busApi *BUSAPI) GetUACInfo(uac string) (UACInfo, error) {
+	response, err := busApi.doGetUACInfo(uac)
 	if err != nil {
-		return UacInfo{}, err
+		return UACInfo{}, err
 	}
 
 	if response.StatusCode == http.StatusNotFound {
-		return UacInfo{}, nil
+		return UACInfo{}, nil
 	}
 
-	return busApi.marshalUacResponse(response)
+	return busApi.marshalUACResponse(response)
 }
 
-func (busApi *BusApi) getUACInfoUrl() (url string) {
+func (busApi *BUSAPI) getUACInfoURL() (url string) {
 	return fmt.Sprintf("%s/uacs/uac",
-		busApi.BaseUrl,
+		busApi.BaseURL,
 	)
 }
 
-func (busApi *BusApi) doGetUacInfo(uac string) (*http.Response, error) {
+func (busApi *BUSAPI) doGetUACInfo(uac string) (*http.Response, error) {
 	uacRequest := UACRequest{UAC: uac}
 	uacJSON, err := json.Marshal(uacRequest)
 	if err != nil {
-		return nil, fmt.Errorf("unable to Marshal error")
+		return nil, fmt.Errorf("unable to marshal UAC request: %w", err)
 	}
 
-	request, err := http.NewRequest("POST", busApi.getUACInfoUrl(),
+	request, err := http.NewRequest(http.MethodPost, busApi.getUACInfoURL(),
 		bytes.NewReader(uacJSON),
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to create UAC info request: %w", err)
 	}
 
-	return busApi.Client.Do(request)
+	response, err := busApi.Client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("unable to call UAC info endpoint: %w", err)
+	}
+
+	return response, nil
 }
 
-func (busApi *BusApi) marshalUacResponse(response *http.Response) (UacInfo, error) {
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return UacInfo{}, fmt.Errorf("unable to read body")
-	}
+func (busApi *BUSAPI) marshalUACResponse(response *http.Response) (UACInfo, error) {
 	defer response.Body.Close()
 
-	var uacInfo UacInfo
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return UACInfo{}, fmt.Errorf("unable to read response body: %w", err)
+	}
+
+	var uacInfo UACInfo
 	err = json.Unmarshal(body, &uacInfo)
 	if err != nil {
-		return UacInfo{}, fmt.Errorf("unable To Unmarshal Json")
+		return UACInfo{}, fmt.Errorf("unable to unmarshal UAC response: %w", err)
 	}
 	return uacInfo, nil
 }

@@ -5,23 +5,29 @@
 {{ template "head_imports" (WrapWelsh .welsh) }}
 </head>
 <body>
-{{ template "header" (WrapWelsh .welsh) }}
-<div class="page__container container" id="main-content">
-    <div class="grid">
-        <div class="grid__col col-8@m">
-            <main id="page-main-content" class="page__main ">
-                {{if .welsh}}
-                    <h1>Mae'n ddrwg gennym, mae problem gyda'r gwasanaeth</h1>
-                    <p>Rhowch gynnig arall arni yn nes ymlaen.</p>
-                    <p>Os ydych wedi dechrau astudiaeth, mae eich atebion wedi cael eu cadw.</p>
-                    <p><a href="#0">Cysylltu &#226 ni</a> os ydych am siarad â rhywun am eich astudiaeth.</p>
-                {{else}}
-                    <h1>Sorry, there is a problem with the service</h1>
-                    <p>Try again later.</p>
-                    <p>If you have started a study, your answers have been saved.</p>
-                    <p><a href="#0">Contact us</a> if you need to speak to someone about your study.</p>
-                {{end}}
+<div class="ons-page">
+    <div class="ons-page__content">
+        {{ template "header" (WrapWelsh .welsh) }}
+        <div class="ons-page__container ons-container" id="main-content" style="min-height: calc(67vh)">
+            <div class="ons-grid">
+                <div class="ons-grid__col ons-col-8@m">
+                    <main id="page-main-content" class="ons-page__main">
+                        {{if .welsh}}
+                            <h1>Mae'n ddrwg gennym, mae problem gyda'r gwasanaeth</h1>
+                            <p>Rhowch gynnig arall arni yn nes ymlaen.</p>
+                            <p>Os ydych wedi dechrau astudiaeth, mae eich atebion wedi cael eu cadw.</p>
+                            <p><a href="#0">Cysylltu &#226 ni</a> os ydych am siarad â rhywun am eich astudiaeth.</p>
+                        {{else}}
+                            <h1>Sorry, there is a problem with the service</h1>
+                            <p>Try again later.</p>
+                            <p>If you have started a study, your answers have been saved.</p>
+                            <p><a href="#0">Contact us</a> if you need to speak to someone about your study.</p>
+                        {{end}}
+                    </main>
+                </div>
+            </div>
         </div>
+        {{ template "footer" (WrapWelsh .welsh) }}
     </div>
 </div>
 </body>

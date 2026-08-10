@@ -16,8 +16,8 @@ type AuthInterface struct {
 	mock.Mock
 }
 
-// AuthenticatedWithUac provides a mock function with given fields: _a0
-func (_m *AuthInterface) AuthenticatedWithUac(_a0 *gin.Context) {
+// AuthenticatedWithUAC provides a mock function with given fields: _a0
+func (_m *AuthInterface) AuthenticatedWithUAC(_a0 *gin.Context) {
 	_m.Called(_a0)
 }
 

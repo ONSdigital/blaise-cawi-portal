@@ -5,24 +5,24 @@
 {{ template "head_imports" (WrapWelsh .welsh)}}
 </head>
 <body>
-<div class="page">
-    <div class="page__content">
-        <a class="skip__link" href="#main-content">
+<div class="ons-page">
+    <div class="ons-page__content">
+        <a class="ons-skip-to-content" href="#main-content">
             {{if .welsh}}
                 Neidio i'r prif gynnwys
             {{else}}
                 Skip to main content
             {{end}}</a>
         {{ template "header" (WrapWelsh .welsh)}}
-        <div class="page__container container " style="min-height: calc(67vh)">
-            <div class="grid">
-                <div class="grid__col col-8@m">
-                    <main id="main-content" class="page__main ">
+        <div class="ons-page__container ons-container" style="min-height: calc(67vh)">
+            <div class="ons-grid">
+                <div class="ons-grid__col ons-col-8@m">
+                    <main id="main-content" class="ons-page__main">
                         {{ if .error}}
                         <div aria-labelledby="error-summary-title" role="alert" tabindex="-1" autofocus="autofocus"
-                             class="panel panel--error">
-                            <div class="panel__header">
-                                <h2 id="error-summary-title" data-qa="error-header" class="panel__title u-fs-r--b">
+                             class="ons-panel ons-panel--error">
+                            <div class="ons-panel__header">
+                                <h2 id="error-summary-title" data-qa="error-header" class="ons-panel__title ons-u-fs-r--b">
                                     {{ if .welsh }}
                                         Mae problem gyda'r dudalen hon
                                     {{else}}
@@ -30,9 +30,9 @@
                                     {{end}}
                                 </h2>
                             </div>
-                            <div class="panel__body">
+                            <div class="ons-panel__body">
                                 <p class="">
-                                    <a href="#uac" class="list__link js-inpagelink">{{ .error }}</a>
+                                    <a href="#uac" class="ons-list__link js-inpagelink">{{ .error }}</a>
                                 </p>
                             </div>
                         </div>
@@ -40,29 +40,29 @@
 
                         {{ if .info}}
                         <div aria-labelledby="info-summary-title" role="alert" tabindex="-1" autofocus="autofocus"
-                             class="panel panel--info">
-                            <div class="panel__body">
-                                <h2 id="info-summary-title" data-qa="info-header" class="panel__title u-fs-r--b">
+                             class="ons-panel ons-panel--info">
+                            <div class="ons-panel__body">
+                                <h2 id="info-summary-title" data-qa="info-header" class="ons-panel__title ons-u-fs-r--b">
                                     {{ .info }}
                                 </h2>
                             </div>
                         </div>
                         {{ end }}
 
-                        <h1 class="u-mt-l">{{if .welsh}}Dechrau'r astudiaeth{{else}}Start study{{end}}</h1>
+                        <h1 class="ons-u-mt-l">{{if .welsh}}Dechrau'r astudiaeth{{else}}Start study{{end}}</h1>
                         <form method="post" action="/auth/login">
-                            <div class="panel panel--{{ if .error}}error{{else}}info{{end}} panel--no-title u-mb-s" id="uac">
-                                <span class="u-vh">Important information: </span>
-                                <div class="panel__body">
+                            <div class="ons-panel ons-panel--{{ if .error}}error{{else}}info{{end}} ons-panel--no-title ons-u-mb-s" id="uac">
+                                <span class="ons-u-vh">Important information: </span>
+                                <div class="ons-panel__body">
 
                                     {{ if .error}}
-                                    <p class="panel__error">
+                                    <p class="ons-panel__error">
                                         <strong>{{ .error }}</strong>
                                     </p>
                                     {{ end }}
 
-                                    <div class="field question__answer">
-                                        <label class="label  label--with-description " for="uac_input">
+                                    <div class="ons-field">
+                                        <label class="ons-label ons-label--with-description" for="uac_input">
                                             {{if .welsh}}
                                                 {{if .uac16}}
                                                     Rhowch eich cod mynediad sy'n cynnwys 16 o nodau
@@ -77,7 +77,7 @@
                                                 {{end}}
                                             {{end}}
                                         </label>
-                                        <span id="description-hint" class="label__description  input--with-description">
+                                        <span id="description-hint" class="ons-label__description ons-input--with-description">
                                             {{if .welsh}}
                                                 Cadwch y cod hwn yn ddiogel. Bydd angen i chi roi eich cod bob tro y byddwch chi'n mynd at eich astudiaeth.
                                             {{else}}
@@ -87,7 +87,7 @@
                                         <input type="hidden" name="_csrf" value="{{.csrf_token}}"/>
                                         <input type="text"
                                                id="uac_input"
-                                               class="input input--text input-type__input uac__input js-uac u-mb-xs {{if .uac16}}input--w-15 {{else}}input--w-10 {{end}}"
+                                               class="ons-input ons-input--text ons-input-type__input uac__input js-uac ons-js-access-code ons-u-mb-xs {{if .uac16}}ons-input--w-15 {{else}}ons-input--w-10 {{end}}"
                                                name="uac"
                                                data-group-size="4"
                                                maxlength={{if .uac16}}"19"{{else}}"14"{{end}}
@@ -99,15 +99,15 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="panel panel--bare u-mb-s">
-                                <span class="panel__icon u-fs-">
-                                    <svg class="svg-icon" viewBox="0 0 10 13" xmlns="http://www.w3.org/2000/svg"
+                            <div class="ons-panel ons-panel--bare ons-u-mb-s">
+                                <span class="ons-panel__icon">
+                                    <svg class="ons-icon" viewBox="0 0 10 13" xmlns="http://www.w3.org/2000/svg"
                                         focusable="false">
                                         <path d="M12.25,6h-.72V4.49a3.5,3.5,0,0,0-7,0V6H3.75A.77.77,0,0,0,3,6.75v6.5a.77.77,0,0,0,.75.75h8.5a.77.77,0,0,0,.75-.75V6.75A.77.77,0,0,0,12.25,6ZM5.54,4.49a2.5,2.5,0,1,1,5,0V6h-5ZM9,11.66a.3.3,0,0,1-.26.34H7.29A.29.29,0,0,1,7,11.69v0l.39-1.82a1,1,0,1,1,1.4-.18.77.77,0,0,1-.18.18Z"
                                             transform="translate(-3 -0.99)"/>
                                     </svg>
                                 </span>
-                                <div class="panel__body">
+                                <div class="ons-panel__body">
                                     {{if .welsh}}
                                         Mae eich gwybodaeth bersonol wedi'i diogelu gan y gyfraith a chaiff ei chadw'n gyfrinachol
                                     {{else}}
@@ -115,9 +115,9 @@
                                     {{end}}
                                 </div>
                             </div>
-                            <div class="btn-group">
-                                <button type="submit" type="submit" id="submit-btn"  class="btn btn-group__btn btn--loader js-loader js-submit-btn">
-                                    <span class="btn__inner">
+                            <div class="ons-btn-group ons-u-mt-s">
+                                <button type="submit" id="submit-btn"  class="ons-btn ons-btn--loader ons-u-mb-no js-loader js-submit-btn">
+                                    <span class="ons-btn__inner">
                                         {{if .welsh}}
                                             Agor yr astudiaeth
                                         {{else}}
@@ -129,24 +129,22 @@
                             </div>
                         </form>
 
-                        <div id="collapsible" class="collapsible js-collapsible u-mt-m" data-btn-close="{{if .welsh}}Cuddio hwn{{else}}Hide this{{end}}">
-                            <div class="collapsible__heading js-collapsible-heading">
-                                <div class="collapsible__controls">
-                                <h2 class="collapsible__title">
+                        <div id="collapsible" class="ons-details ons-js-details ons-u-mt-s">
+                            <div class="ons-details__heading ons-js-details-heading" role="button">
+                                <h2 class="ons-details__title ons-u-fs-r--b">
                                 {{if .welsh}}
                                     Ble i ddod o hyd i'ch cod mynediad
                                 {{else}}
                                     Where to find your access code
                                 {{end}}
                                 </h2>
-                                <span class="collapsible__icon">
-                                    <svg class="svg-icon " viewBox="0 0 8 13" xmlns="http://www.w3.org/2000/svg" focusable="false" fill="currentColor">
+                                <span class="ons-details__icon">
+                                    <svg class="ons-icon" viewBox="0 0 8 13" xmlns="http://www.w3.org/2000/svg" focusable="false" fill="currentColor" role="img" aria-hidden="true">
                                         <path d="M5.74,14.28l-.57-.56a.5.5,0,0,1,0-.71h0l5-5-5-5a.5.5,0,0,1,0-.71h0l.57-.56a.5.5,0,0,1,.71,0h0l5.93,5.93a.5.5,0,0,1,0,.7L6.45,14.28a.5.5,0,0,1-.71,0Z" transform="translate(-5.02 -1.59)" />
                                     </svg>
                                 </span>
                             </div>
-                        </div>
-                        <div id="collapsible-content" class="collapsible__content js-collapsible-content">
+                            <div id="collapsible-content" class="ons-details__content ons-js-details-content">
 
                             <p>
                             {{if .welsh}}
@@ -197,8 +195,8 @@
                                     alt="An example of the study letter showing that the access code is in the centre of the letter"></p>
                             {{end}}
 
-                            <button type="button" class="btn js-collapsible-button u-d-no btn--secondary btn--small" aria-hidden="true">
-                                <span class="btn__inner js-collapsible-button-inner">
+                            <button type="button" class="ons-btn js-collapsible-button ons-btn--secondary ons-btn--small">
+                                <span class="ons-btn__inner js-collapsible-button-inner">
                                 {{if .welsh}}
                                     Cuddio hwn
                                 {{else}}
@@ -207,12 +205,13 @@
 
                                 </span>
                                 {{if .welsh}}
-                                    <span class="btn__context u-vh">Ble i ddod o hyd i'ch cod mynediad?</span>
+                                    <span class="ons-u-vh">Ble i ddod o hyd i'ch cod mynediad?</span>
                                 {{else}}
-                                    <span class="btn__context u-vh">Where to find your access code?</span>
+                                    <span class="ons-u-vh">Where to find your access code?</span>
                                 {{end}}
 
                             </button>
+                            </div>
                         </div>
 
                     </main>
@@ -248,7 +247,6 @@
         }
 
         if(!digitRegExp.test(event.key)) {
-            console.log(1);
             event.preventDefault();
         }
     }, false);

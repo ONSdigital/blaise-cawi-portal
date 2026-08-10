@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
+	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
 	"github.com/ONSdigital/blaise-cawi-portal/utils"
 	"github.com/blendle/zapdriver"
@@ -19,7 +21,6 @@ import (
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
-	csrf "github.com/srbry/gin-csrf"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/api/idtoken"
@@ -27,33 +28,68 @@ import (
 
 const CDN = "https://cdn.ons.gov.uk"
 
+const httpClientTimeout = 3 * time.Minute
+
+const redisPoolSize = 10
+
 var (
 	srcHosts              = fmt.Sprintf("'self' %s", CDN)
-	defaultSRC            = fmt.Sprintf("default-src %s 'unsafe-inline'", srcHosts)
-	fontSRC               = fmt.Sprintf("font-src %s data:", srcHosts)
-	imgSRC                = fmt.Sprintf("img-src %s data:", srcHosts)
-	contentSecurityPolicy = fmt.Sprintf("%s; %s; %s", defaultSRC, fontSRC, imgSRC)
+	defaultSrc            = fmt.Sprintf("default-src %s 'unsafe-inline'", srcHosts)
+	fontSrc               = fmt.Sprintf("font-src %s data:", srcHosts)
+	imgSrc                = fmt.Sprintf("img-src %s data:", srcHosts)
+	contentSecurityPolicy = fmt.Sprintf("%s; %s; %s", defaultSrc, fontSrc, imgSrc)
 )
 
 type Config struct {
 	RedisSessionDB   string `default:"localhost:6379" split_words:"true"`
 	SessionSecret    string `required:"true" split_words:"true"`
 	EncryptionSecret string `required:"true" split_words:"true"`
-	CatiUrl          string `required:"true" split_words:"true"`
+	CatiURL          string `required:"true" split_words:"true"`
 	JWTSecret        string `required:"true" split_words:"true"`
-	BusUrl           string `required:"true" split_words:"true"`
-	BusClientId      string `required:"true" split_words:"true"`
-	BlaiseRestApi    string `required:"true" split_words:"true"`
+	BusURL           string `required:"true" split_words:"true"`
+	BusClientID      string `required:"true" split_words:"true"`
+	BlaiseRestAPI    string `required:"true" split_words:"true"`
 	Serverpark       string `default:"gusty"`
-	Port             string `default:"8080"`
-	UacKind          string `default:"uac" split_words:"true"`
+	Port             string `default:"8082"`
+	UACKind          string `default:"uac" split_words:"true"`
 	DevMode          bool   `default:"false" split_words:"true"`
 	Debug            bool   `default:"false"`
+}
+
+func (config *Config) Validate() error {
+	requiredFields := []struct {
+		name  string
+		value string
+	}{
+		{name: "SESSION_SECRET", value: config.SessionSecret},
+		{name: "ENCRYPTION_SECRET", value: config.EncryptionSecret},
+		{name: "CATI_URL", value: config.CatiURL},
+		{name: "JWT_SECRET", value: config.JWTSecret},
+		{name: "BUS_URL", value: config.BusURL},
+		{name: "BUS_CLIENT_ID", value: config.BusClientID},
+		{name: "BLAISE_REST_API", value: config.BlaiseRestAPI},
+	}
+
+	var missing []string
+	for _, field := range requiredFields {
+		if strings.TrimSpace(field.value) == "" {
+			missing = append(missing, field.name)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("required config values are missing or empty: %s", strings.Join(missing, ", "))
+	}
+
+	return nil
 }
 
 func LoadConfig() (*Config, error) {
 	var config Config
 	if err := envconfig.Process("", &config); err != nil {
+		return nil, err
+	}
+	if err := config.Validate(); err != nil {
 		return nil, err
 	}
 	return &config, nil
@@ -65,7 +101,6 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 		err    error
 	)
 	if config.DevMode {
-		// logger, err = zap.NewDevelopment()
 		logger, err = zapdriver.NewProduction()
 	} else {
 		var zapOptions []zap.Option
@@ -81,27 +116,22 @@ func NewLogger(config *Config) (*zap.Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		if err := logger.Sync(); err != nil {
-			log.Println("Error occurred during logger synchronization:", err)
-		}
-	}()
+	zap.ReplaceGlobals(logger)
 	return logger, nil
 }
 
-func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Logger, languageManger languagemanager.LanguageManagerInterface) func(*gin.Context) {
+func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Logger, languageManager languagemanager.LanguageManagerInterface) func(*gin.Context) {
 	return func(context *gin.Context) {
 		logger.Info("CSRF mismatch", utils.GetRequestSource(context)...)
 		var errorMessage string
-		isWelsh := languageManger.IsWelsh(context)
+		isWelsh := languageManager.IsWelsh(context)
 		if isWelsh {
 			errorMessage = "Cais wedi dod i ben, triwch eto"
 		} else {
 			errorMessage = "Request timed out, please try again"
 		}
 		context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
-			"uac16":      config.UacKind == "uac16",
+			"uac16":      config.UACKind == "uac16",
 			"info":       errorMessage,
 			"csrf_token": csrfManager.GetToken(context),
 			"welsh":      isWelsh,
@@ -110,13 +140,13 @@ func CSRFErrorFunc(csrfManager csrf.CSRFManager, config *Config, logger *zap.Log
 	}
 }
 
-func NewCSRFManager(config *Config, logger *zap.Logger, languageManger languagemanager.LanguageManagerInterface) csrf.CSRFManager {
+func NewCSRFManager(config *Config, logger *zap.Logger, languageManager languagemanager.LanguageManagerInterface) csrf.CSRFManager {
 	csrfManager := &csrf.DefaultCSRFManager{
 		SessionName: "session",
 		Secret:      config.SessionSecret,
 	}
 
-	csrfManager.ErrorFunc = CSRFErrorFunc(csrfManager, config, logger, languageManger)
+	csrfManager.ErrorFunc = CSRFErrorFunc(csrfManager, config, logger, languageManager)
 
 	return csrfManager
 }
@@ -129,7 +159,7 @@ func UserSessionStore(config *Config) (sessions.Store, error) {
 		store = cookie.NewStore([]byte(config.SessionSecret), []byte(config.EncryptionSecret))
 	} else {
 		var err error
-		store, err = redis.NewStore(10, "tcp", config.RedisSessionDB, "", []byte(config.SessionSecret), []byte(config.EncryptionSecret))
+		store, err = redis.NewStore(redisPoolSize, "tcp", config.RedisSessionDB, "", "", []byte(config.SessionSecret), []byte(config.EncryptionSecret))
 		if err != nil {
 			return nil, err
 		}
@@ -157,10 +187,10 @@ type Server struct {
 func (server *Server) SetupRouter() *gin.Engine {
 	logger, err := NewLogger(server.Config)
 	if err != nil {
-		log.Fatalf("Error setting up logger: %s", err)
+		zap.L().Fatal("error setting up logger", zap.Error(err))
 	}
 	httpRouter := gin.Default()
-	httpClient := &http.Client{}
+	httpClient := &http.Client{Timeout: httpClientTimeout}
 
 	securityConfig := secure.DefaultConfig()
 	securityConfig.ContentSecurityPolicy = contentSecurityPolicy
@@ -173,7 +203,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	store, err := UserSessionStore(server.Config)
 	if err != nil {
-		log.Fatalf("Could not connect to session database: %s", err)
+		logger.Fatal("Could not connect to session database", zap.Error(err))
 	}
 
 	cookieStore := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
@@ -214,7 +244,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	}
 	httpRouter.Use(sessions.SessionsManyStores(sessionStores))
 
-	//This router has access to all templates in the templates folder
+	// This router has access to all templates in the templates folder
 	httpRouter.TrustedPlatform = gin.PlatformGoogleAppEngine
 	httpRouter.SetFuncMap(template.FuncMap{
 		"WrapWelsh": WrapWelsh,
@@ -222,7 +252,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.LoadHTMLGlob("templates/*")
 	httpRouter.Static("/assets", "./assets")
 
-	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientId)
+	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientID)
 	if err != nil {
 		logger.Fatal("Error creating bus client", zap.Error(err))
 	}
@@ -231,24 +261,25 @@ func (server *Server) SetupRouter() *gin.Engine {
 		JWTSecret: server.Config.JWTSecret,
 	}
 
-	blaiseRestApi := &blaiserestapi.BlaiseRestApi{
-		BaseUrl:    server.Config.BlaiseRestApi,
+	blaiseRestApi := &blaiserestapi.BlaiseRestAPI{
+		BaseURL:    server.Config.BlaiseRestAPI,
 		Serverpark: server.Config.Serverpark,
-		Client:     &http.Client{},
+		Client:     &http.Client{Timeout: httpClientTimeout},
+		Logger:     logger,
 	}
 
-	languageManager := &languagemanager.Manager{SessionName: "language_session"}
+	languageManager := &languagemanager.Manager{SessionName: "language_session", Logger: logger}
 	csrfManager := NewCSRFManager(server.Config, logger, languageManager)
 
 	auth := &authenticate.Auth{
 		JWTCrypto:     jwtCrypto,
-		BlaiseRestApi: blaiseRestApi,
+		BlaiseRestAPI: blaiseRestApi,
 		Logger:        logger,
-		BusApi: &busapi.BusApi{
-			BaseUrl: server.Config.BusUrl,
+		BUSAPI: &busapi.BUSAPI{
+			BaseURL: server.Config.BusURL,
 			Client:  client,
 		},
-		UacKind:         server.Config.UacKind,
+		UACKind:         server.Config.UACKind,
 		CSRFManager:     csrfManager,
 		LanguageManager: languageManager,
 	}
@@ -256,7 +287,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	authController := &AuthController{
 		Auth:            auth,
 		Logger:          logger,
-		UacKind:         server.Config.UacKind,
+		UACKind:         server.Config.UACKind,
 		CSRFManager:     csrfManager,
 		LanguageManager: languageManager,
 	}
@@ -270,8 +301,9 @@ func (server *Server) SetupRouter() *gin.Engine {
 		Auth:            auth,
 		JWTCrypto:       jwtCrypto,
 		Logger:          logger,
-		CatiUrl:         server.Config.CatiUrl,
+		CatiURL:         server.Config.CatiURL,
 		HttpClient:      httpClient,
+		Debug:           server.Config.Debug,
 		LanguageManager: languageManager,
 	}
 	instrumentController.AddRoutes(httpRouter)
@@ -290,7 +322,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	})
 
 	httpRouter.NoRoute(func(context *gin.Context) {
-		context.HTML(http.StatusOK, "not_found.tmpl", gin.H{"welsh": languageManager.IsWelsh(context)})
+		context.HTML(http.StatusNotFound, "not_found.tmpl", gin.H{"welsh": languageManager.IsWelsh(context)})
 	})
 
 	return httpRouter

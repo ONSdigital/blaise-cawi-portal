@@ -1,6 +1,5 @@
-*_test.go
-README.md
-portal.gif
-appengine_templates
-cover.out
-**/mocks/
+#!include:.gitignore
+.github/
+.git
+.gitignore
+.gcloudignore

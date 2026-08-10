@@ -3,107 +3,109 @@ package blaiserestapi_test
 import (
 	"fmt"
 	"net/http"
+	"testing"
 
 	"github.com/ONSdigital/blaise-cawi-portal/blaiserestapi"
 	"github.com/jarcoal/httpmock"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Blaise rest api endpoints", func() {
-	var (
-		restApiUrl     = "http://localhost"
-		serverpark     = "foobar"
-		instrumentName = "lolcats"
-		blaiseRestApi  = &blaiserestapi.BlaiseRestApi{
-			BaseUrl:    restApiUrl,
-			Serverpark: serverpark,
-			Client:     &http.Client{},
+func TestGetInstrumentSettings(t *testing.T) {
+	restAPIURL := "http://localhost"
+	serverpark := "foobar"
+	instrumentName := "lolcats"
+	client := &http.Client{}
+	blaiseRestAPI := &blaiserestapi.BlaiseRestAPI{
+		BaseURL:    restAPIURL,
+		Serverpark: serverpark,
+		Client:     client,
+	}
+
+	httpmock.ActivateNonDefault(client)
+	t.Cleanup(httpmock.DeactivateAndReset)
+
+	url := fmt.Sprintf("%s/api/v2/serverparks/%s/questionnaires/%s/settings", restAPIURL, serverpark, instrumentName)
+
+	t.Run("returns not found error when instrument does not exist", func(t *testing.T) {
+		httpmock.Reset()
+		httpmock.RegisterResponder("GET", url, httpmock.NewBytesResponder(404, []byte{}))
+
+		instrumentSettings, err := blaiseRestAPI.GetInstrumentSettings(instrumentName)
+		if err == nil || err.Error() != "instrument not found" {
+			t.Fatalf("error = %v, want instrument not found", err)
 		}
-	)
-
-	BeforeEach(func() {
-		httpmock.Activate()
+		if len(instrumentSettings) != 0 {
+			t.Fatalf("instrumentSettings = %+v, want empty", instrumentSettings)
+		}
 	})
 
-	AfterEach(func() {
-		httpmock.DeactivateAndReset()
+	t.Run("returns instrument settings when instrument exists", func(t *testing.T) {
+		httpmock.Reset()
+		httpmock.RegisterResponder("GET", url,
+			httpmock.NewJsonResponderOrPanic(200, blaiserestapi.InstrumentSettings{{
+				Type:           "StrictInterviewing",
+				SessionTimeout: 15,
+			}}))
+
+		instrumentSettings, err := blaiseRestAPI.GetInstrumentSettings(instrumentName)
+		if err != nil {
+			t.Fatalf("GetInstrumentSettings() error: %v", err)
+		}
+		if len(instrumentSettings) != 1 {
+			t.Fatalf("len(instrumentSettings) = %d, want 1", len(instrumentSettings))
+		}
+		if instrumentSettings[0].Type != "StrictInterviewing" {
+			t.Fatalf("Type = %q, want StrictInterviewing", instrumentSettings[0].Type)
+		}
+		if instrumentSettings[0].SessionTimeout != 15 {
+			t.Fatalf("SessionTimeout = %d, want 15", instrumentSettings[0].SessionTimeout)
+		}
+	})
+}
+
+func TestInstrumentSettingsStrictInterviewing(t *testing.T) {
+	t.Run("returns first StrictInterviewing block when present", func(t *testing.T) {
+		instrumentSettings := blaiserestapi.InstrumentSettings{
+			{
+				Type:                 "StrictInterviewing",
+				SessionTimeout:       15,
+				SaveSessionOnTimeout: true,
+			},
+			{
+				Type:           "StrictCati",
+				SessionTimeout: 55,
+			},
+			{
+				Type:                 "StrictInterviewing",
+				SessionTimeout:       56,
+				SaveSessionOnTimeout: false,
+			},
+		}
+
+		strict := instrumentSettings.StrictInterviewing()
+		if strict.SessionTimeout != 15 {
+			t.Fatalf("SessionTimeout = %d, want 15", strict.SessionTimeout)
+		}
+		if strict.Type != "StrictInterviewing" {
+			t.Fatalf("Type = %q, want StrictInterviewing", strict.Type)
+		}
 	})
 
-	Describe("Get instrument settings", func() {
-		Context("when the instrument does not exist", func() {
-			JustBeforeEach(func() {
-				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/api/v2/serverparks/%s/questionnaires/%s/settings", restApiUrl, serverpark, instrumentName),
-					httpmock.NewBytesResponder(404, []byte{}))
-			})
+	t.Run("returns empty settings block when StrictInterviewing is absent", func(t *testing.T) {
+		instrumentSettings := blaiserestapi.InstrumentSettings{
+			{
+				Type:                 "FreeInterviewing",
+				SessionTimeout:       15,
+				SaveSessionOnTimeout: true,
+			},
+			{
+				Type:           "StrictCati",
+				SessionTimeout: 15,
+			},
+		}
 
-			It("returns a NotFound error", func() {
-				instrumentSettings, err := blaiseRestApi.GetInstrumentSettings(instrumentName)
-				Expect(err).To(MatchError("instrument not found"))
-				Expect(instrumentSettings).To(BeEmpty())
-			})
-		})
-
-		Context("when the instrument does exist", func() {
-			JustBeforeEach(func() {
-				httpmock.RegisterResponder("GET", fmt.Sprintf("%s/api/v2/serverparks/%s/questionnaires/%s/settings", restApiUrl, serverpark, instrumentName),
-					httpmock.NewJsonResponderOrPanic(200, blaiserestapi.InstrumentSettings{
-						{
-							Type:           "StrictInterviewing",
-							SessionTimeout: 15,
-						},
-					}))
-			})
-
-			It("returns instrument settings", func() {
-				instrumentSettings, err := blaiseRestApi.GetInstrumentSettings(instrumentName)
-				Expect(err).To(BeNil())
-				Expect(instrumentSettings).To(HaveLen(1))
-				Expect(instrumentSettings[0].Type).To(Equal("StrictInterviewing"))
-				Expect(instrumentSettings[0].SessionTimeout).To(Equal(15))
-			})
-		})
+		strict := instrumentSettings.StrictInterviewing()
+		if strict != (blaiserestapi.InstrumentSettingsType{}) {
+			t.Fatalf("StrictInterviewing() = %+v, want empty", strict)
+		}
 	})
-})
-
-var _ = Describe("InstrumentSettings.StrictInterviewing", func() {
-	Context("when the instrument settings include a 'StrictInterviewing' type", func() {
-		It("returns the StrictInterviewing settings block", func() {
-			var instrumentSettings = blaiserestapi.InstrumentSettings{
-				{
-					Type:                 "StrictInterviewing",
-					SessionTimeout:       15,
-					SaveSessionOnTimeout: true,
-				},
-				{
-					Type:           "StrictCati",
-					SessionTimeout: 55,
-				},
-				{
-					Type:                 "StrictInterviewing",
-					SessionTimeout:       56,
-					SaveSessionOnTimeout: false,
-				},
-			}
-			Expect(instrumentSettings.StrictInterviewing().SessionTimeout).To(Equal(15))
-			Expect(instrumentSettings.StrictInterviewing().Type).To(Equal("StrictInterviewing"))
-		})
-	})
-
-	Context("when the instrument settings do not include a 'StrictInterviewing' type", func() {
-		It("returns an empty settings block", func() {
-			var instrumentSettings = blaiserestapi.InstrumentSettings{
-				{
-					Type:                 "FreeInterviewing",
-					SessionTimeout:       15,
-					SaveSessionOnTimeout: true,
-				},
-				{
-					Type:           "StrictCati",
-					SessionTimeout: 15,
-				},
-			}
-			Expect(instrumentSettings.StrictInterviewing()).To(Equal(blaiserestapi.InstrumentSettingsType{}))
-		})
-	})
-})
+}

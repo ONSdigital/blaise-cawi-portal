@@ -1,7 +1,8 @@
 package authenticate
 
 import (
-	"fmt"
+	"crypto/sha256"
+	"encoding/hex"
 	"regexp"
 	"strings"
 
@@ -10,48 +11,48 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	diaInstrumentPatternA = regexp.MustCompile(`^dia\d{4}a$`)
+	diaInstrumentPatternB = regexp.MustCompile(`^dia\d{4}b$`)
+)
+
 type UACClaims struct {
 	UAC         string `json:"uac"`
 	AuthTimeout int    `json:"auth_timeout"`
-	busapi.UacInfo
+	busapi.UACInfo
 	jwt.RegisteredClaims
 }
 
 func (uacClaims *UACClaims) AuthenticatedForInstrument(instrumentName string) bool {
-	if strings.EqualFold(uacClaims.UacInfo.InstrumentName, instrumentName) {
-		return true
-	}
-	return uacClaims.CheckDiaInstrument(uacClaims.UacInfo.InstrumentName, instrumentName)
+	return strings.EqualFold(uacClaims.UACInfo.InstrumentName, instrumentName) ||
+		uacClaims.checkDiaInstrument(uacClaims.UACInfo.InstrumentName, instrumentName)
 }
 
-func (uacClaims *UACClaims) CheckDiaInstrument(instrumentName1, instrumentName2 string) bool {
-	diaA, diaAErr := regexp.MatchString(`^dia\d{4}a$`, instrumentName1)
-	if diaAErr != nil {
-		fmt.Print(diaAErr)
-	}
+func (uacClaims *UACClaims) checkDiaInstrument(instrumentName1, instrumentName2 string) bool {
+	return diaInstrumentPatternA.MatchString(instrumentName1) &&
+		diaInstrumentPatternB.MatchString(instrumentName2)
+}
 
-	diaB, diaBErr := regexp.MatchString(`^dia\d{4}b$`, instrumentName2)
-	if diaBErr != nil {
-		fmt.Print(diaBErr)
-	}
-
-	if diaA && diaB {
-		return true
+func (uacClaims *UACClaims) AuthenticatedForCase(caseID string) bool {
+	if !uacClaims.UACInfo.Disabled {
+		return strings.EqualFold(uacClaims.UACInfo.CaseID, caseID)
 	}
 	return false
 }
 
-func (uacClaims *UACClaims) AuthenticatedForCase(caseID string) bool {
-	if !uacClaims.UacInfo.Disabled  {
-        return strings.EqualFold(uacClaims.UacInfo.CaseID, caseID)
-    }
-    return false
-}
-
 func (uacClaims *UACClaims) LogFields() []zap.Field {
-	var fields []zap.Field
-	fields = append(fields, zap.String("AuthedInstrumentName", uacClaims.UacInfo.InstrumentName))
-	fields = append(fields, zap.String("AuthedCaseID", uacClaims.UacInfo.CaseID))
+	fields := make([]zap.Field, 0, 3)
+	fields = append(fields, zap.String("AuthedInstrumentName", uacClaims.UACInfo.InstrumentName))
+	fields = append(fields, zap.String("AuthedCaseIDFingerprint", CaseIDFingerprint(uacClaims.UACInfo.CaseID)))
 	fields = append(fields, zap.Int("AuthTimeout", uacClaims.AuthTimeout))
 	return fields
+}
+
+func CaseIDFingerprint(caseID string) string {
+	normalized := strings.TrimSpace(strings.ToLower(caseID))
+	if normalized == "" {
+		return "unknown"
+	}
+	hash := sha256.Sum256([]byte(normalized))
+	return hex.EncodeToString(hash[:])[:12]
 }
