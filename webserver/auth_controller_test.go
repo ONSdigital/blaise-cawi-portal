@@ -261,10 +261,10 @@ func TestAuthControllerPostLoginEndpoint(t *testing.T) {
 			h.config.UACKind = "uac"
 			h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
 			h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-			csrfToken, _ := h.csrfTokenAndCookie(t)
+			csrfToken, cookieHeader := h.csrfTokenAndCookie(t)
 
 			data := url.Values{"uac": []string{"123"}, "_csrf": []string{csrfToken}}
-			recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded"})
+			recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Cookie": cookieHeader})
 			if err != nil {
 				t.Fatalf("post(/auth/login) error: %v", err)
 			}
@@ -282,10 +282,10 @@ func TestAuthControllerPostLoginEndpoint(t *testing.T) {
 			h.config.UACKind = "uac16"
 			h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
 			h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-			csrfToken, _ := h.csrfTokenAndCookie(t)
+			csrfToken, cookieHeader := h.csrfTokenAndCookie(t)
 
 			data := url.Values{"uac": []string{"123"}, "_csrf": []string{csrfToken}}
-			recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded"})
+			recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Cookie": cookieHeader})
 			if err != nil {
 				t.Fatalf("post(/auth/login) error: %v", err)
 			}

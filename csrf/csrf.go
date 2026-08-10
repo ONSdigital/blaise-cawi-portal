@@ -3,8 +3,8 @@ package csrf
 import (
 	"crypto/sha1"
 	"encoding/base64"
-	"errors"
 	"io"
+	"net/http"
 
 	"github.com/dchest/uniuri"
 	"github.com/gin-contrib/sessions"
@@ -20,7 +20,7 @@ const (
 var defaultIgnoreMethods = []string{"GET", "HEAD", "OPTIONS"}
 
 var defaultErrorFunc = func(c *gin.Context) {
-	panic(errors.New("CSRF token mismatch"))
+	c.AbortWithStatus(http.StatusForbidden)
 }
 
 var defaultTokenGetter = func(c *gin.Context) string {
@@ -111,7 +111,10 @@ func (csrfManager *DefaultCSRFManager) GetToken(c *gin.Context) string {
 	if !ok {
 		salt = uniuri.New()
 		session.Set(csrfSalt, salt)
-		_ = session.Save()
+		if err := session.Save(); err != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return ""
+		}
 	}
 	token := tokenize(csrfManager.Secret, salt)
 	c.Set(csrfToken, token)
