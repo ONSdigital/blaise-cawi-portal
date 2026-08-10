@@ -8,7 +8,7 @@ import (
 	"unicode"
 )
 
-func SanitizeLogInput(input string) string {
+func SanitiseLogInput(input string) string {
 	escapedInput := html.EscapeString(input)
 	escapedInput = strings.ReplaceAll(escapedInput, "\n", "")
 	escapedInput = strings.ReplaceAll(escapedInput, "\r", "")
@@ -26,13 +26,10 @@ func GetRequestSource(context *gin.Context) []zap.Field {
 	remoteAddress := context.Request.RemoteAddr
 	clientIP := context.ClientIP()
 
-	requestSource = append(requestSource, zap.String("SourceIP", remoteAddress))
+	requestSource = append(requestSource, zap.String("SourceIP", SanitiseLogInput(remoteAddress)))
 
 	if remoteAddress != clientIP && clientIP != "" {
-
-		clientIP = strings.ReplaceAll(clientIP, "\n", "")
-		clientIP = strings.ReplaceAll(clientIP, "\r", "")
-
+		clientIP = SanitiseLogInput(clientIP)
 		requestSource = append(requestSource, zap.String("SourceXFF", clientIP))
 	}
 

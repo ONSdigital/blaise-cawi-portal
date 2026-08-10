@@ -74,7 +74,7 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 		return nil, fmt.Errorf("failed to decrypt JWT for instrument auth: %w", err)
 	}
 	instrumentName := context.Param("instrumentName")
-	sanitizedInstrumentName := utils.SanitizeLogInput(instrumentName)
+	sanitizedInstrumentName := utils.SanitiseLogInput(instrumentName)
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
 		instrumentController.logger().Info("Not authenticated for instrument",
 			append(uacClaim.LogFields(), zap.String("InstrumentName", sanitizedInstrumentName))...)

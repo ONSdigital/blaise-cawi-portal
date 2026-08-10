@@ -196,8 +196,8 @@ func (auth *Auth) Login(context *gin.Context, session sessions.Session) {
 		return
 	}
 
-	instrumentName := utils.SanitizeLogInput(uacInfo.InstrumentName)
-	caseID := utils.SanitizeLogInput(uacInfo.CaseID)
+	instrumentName := utils.SanitiseLogInput(uacInfo.InstrumentName)
+	caseID := utils.SanitiseLogInput(uacInfo.CaseID)
 
 	auth.logger().Info(fmt.Sprintf("Successful auth with questionnaire: %s, case ID: %s", instrumentName, caseID),
 		append(utils.GetRequestSource(context),
