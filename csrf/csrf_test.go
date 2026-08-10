@@ -17,15 +17,15 @@ import (
 // failSession is a sessions.Session whose Save always returns an error.
 type failSession struct{}
 
-func (failSession) ID() string                                      { return "" }
-func (failSession) Get(key interface{}) interface{}                 { return nil }
-func (failSession) Set(key interface{}, val interface{})            {}
-func (failSession) Delete(key interface{})                          {}
-func (failSession) Clear()                                          {}
-func (failSession) AddFlash(value interface{}, vars ...string)      {}
-func (failSession) Flashes(vars ...string) []interface{}            { return nil }
-func (failSession) Options(sessions.Options)                        {}
-func (failSession) Save() error                                     { return errors.New("store unavailable") }
+func (failSession) ID() string                                 { return "" }
+func (failSession) Get(key interface{}) interface{}            { return nil }
+func (failSession) Set(key interface{}, val interface{})       {}
+func (failSession) Delete(key interface{})                     {}
+func (failSession) Clear()                                     {}
+func (failSession) AddFlash(value interface{}, vars ...string) {}
+func (failSession) Flashes(vars ...string) []interface{}       { return nil }
+func (failSession) Options(sessions.Options)                   {}
+func (failSession) Save() error                                { return errors.New("store unavailable") }
 
 func buildRouter(csrfManager *DefaultCSRFManager) *gin.Engine {
 	gin.SetMode(gin.TestMode)

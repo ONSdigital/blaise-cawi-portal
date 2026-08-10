@@ -54,8 +54,8 @@ type Config struct {
 	Port             string `default:"8082"`
 	UACKind          string `default:"uac" split_words:"true"`
 	// DevMode switches the session backend to cookie store (no Redis) and relaxes security middleware; it does not affect log verbosity.
-	DevMode          bool   `default:"false" split_words:"true"`
-	Debug            bool   `default:"false"`
+	DevMode bool `default:"false" split_words:"true"`
+	Debug   bool `default:"false"`
 }
 
 func (config *Config) Validate() error {

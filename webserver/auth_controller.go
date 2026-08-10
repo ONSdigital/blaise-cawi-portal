@@ -91,4 +91,3 @@ func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
 		"welsh":   authController.LanguageManager.IsWelsh(context),
 	})
 }
-
