@@ -1,7 +1,7 @@
 package csrf
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
 	"io"
 	"net/http"
@@ -130,7 +130,7 @@ func (csrfManager *DefaultCSRFManager) getSession(c *gin.Context) sessions.Sessi
 }
 
 func tokenize(secret, salt string) string {
-	h := sha1.New()
+	h := sha256.New()
 	_, _ = io.WriteString(h, salt+"-"+secret)
 	hash := base64.URLEncoding.EncodeToString(h.Sum(nil))
 
