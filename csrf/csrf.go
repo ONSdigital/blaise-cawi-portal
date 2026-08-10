@@ -1,9 +1,9 @@
 package csrf
 
 import (
-	"crypto/sha1"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
-	"io"
 	"net/http"
 
 	"github.com/dchest/uniuri"
@@ -90,7 +90,8 @@ func (csrfManager *DefaultCSRFManager) Middleware() gin.HandlerFunc {
 
 		token := tokenGetter(c)
 
-		if tokenize(csrfManager.Secret, salt) != token {
+		expectedToken := tokenize(csrfManager.Secret, salt)
+		if !hmac.Equal([]byte(expectedToken), []byte(token)) {
 			errorFunc(c)
 			return
 		}
@@ -133,8 +134,8 @@ func (csrfManager *DefaultCSRFManager) getSession(c *gin.Context) sessions.Sessi
 }
 
 func tokenize(secret, salt string) string {
-	h := sha1.New()
-	_, _ = io.WriteString(h, salt+"-"+secret)
+	h := hmac.New(sha256.New, []byte(secret))
+	_, _ = h.Write([]byte(salt))
 	hash := base64.URLEncoding.EncodeToString(h.Sum(nil))
 
 	return hash
