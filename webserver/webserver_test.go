@@ -1,11 +1,14 @@
 package webserver
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"google.golang.org/api/idtoken"
 )
 
 type testLanguageManager struct {
@@ -319,4 +323,140 @@ func TestRegisterUtilityRoutesLanguageAndNoRoute(t *testing.T) {
 	if languageManager.isWelshHits == 0 {
 		t.Fatal("expected NoRoute handler to query language manager")
 	}
+}
+
+func TestNewHTTPClientUsesConfiguredTimeout(t *testing.T) {
+	client := newHTTPClient()
+
+	if client.Timeout != httpClientTimeout {
+		t.Fatalf("client.Timeout = %v, want %v", client.Timeout, httpClientTimeout)
+	}
+}
+
+func TestSetupRouterBuildsRouterWithCoreRoutes(t *testing.T) {
+	withRepoRootAsWorkingDirectory(t)
+
+	originalIDTokenNewClient := idTokenNewClient
+	idTokenNewClient = func(_ context.Context, _ string, _ ...idtoken.ClientOption) (*http.Client, error) {
+		return &http.Client{}, nil
+	}
+	t.Cleanup(func() {
+		idTokenNewClient = originalIDTokenNewClient
+	})
+
+	server := &Server{Config: &Config{
+		DevMode:          true,
+		SessionSecret:    "session-secret",
+		EncryptionSecret: "0123456789abcdef",
+		CatiURL:          "https://cati.test",
+		JWTSecret:        "jwt-secret",
+		BusURL:           "https://bus.test",
+		BusClientID:      "test-audience",
+		BlaiseRestAPI:    "https://rest.test",
+		Serverpark:       "gusty",
+		UACKind:          "uac",
+	}}
+
+	router, err := server.SetupRouter()
+	if err != nil {
+		t.Fatalf("SetupRouter() error: %v", err)
+	}
+
+	if router == nil {
+		t.Fatal("SetupRouter() returned nil router")
+	}
+
+	if router.TrustedPlatform != gin.PlatformGoogleAppEngine {
+		t.Fatalf("TrustedPlatform = %q, want %q", router.TrustedPlatform, gin.PlatformGoogleAppEngine)
+	}
+
+	routes := router.Routes()
+	for _, expectedRoute := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodGet, path: "/"},
+		{method: http.MethodGet, path: "/auth/login"},
+		{method: http.MethodGet, path: "/health"},
+		{method: http.MethodPost, path: "/language/:lang"},
+		{method: http.MethodGet, path: "/:instrumentName/"},
+	} {
+		if !routeExists(routes, expectedRoute.method, expectedRoute.path) {
+			t.Fatalf("expected route %s %s to be registered", expectedRoute.method, expectedRoute.path)
+		}
+	}
+}
+
+func TestSetupRouterReturnsErrorWhenBusClientCreationFails(t *testing.T) {
+	withRepoRootAsWorkingDirectory(t)
+
+	originalIDTokenNewClient := idTokenNewClient
+	idTokenNewClient = func(_ context.Context, _ string, _ ...idtoken.ClientOption) (*http.Client, error) {
+		return nil, errors.New("unable to create token client")
+	}
+	t.Cleanup(func() {
+		idTokenNewClient = originalIDTokenNewClient
+	})
+
+	server := &Server{Config: &Config{
+		DevMode:          true,
+		SessionSecret:    "session-secret",
+		EncryptionSecret: "0123456789abcdef",
+		CatiURL:          "https://cati.test",
+		JWTSecret:        "jwt-secret",
+		BusURL:           "https://bus.test",
+		BusClientID:      "test-audience",
+		BlaiseRestAPI:    "https://rest.test",
+		Serverpark:       "gusty",
+		UACKind:          "uac",
+	}}
+
+	router, err := server.SetupRouter()
+	if err == nil {
+		t.Fatal("SetupRouter() expected error, got nil")
+	}
+	if router != nil {
+		t.Fatalf("router = %v, want nil", router)
+	}
+	if !strings.Contains(err.Error(), "error creating bus client") {
+		t.Fatalf("error = %q, want to contain %q", err.Error(), "error creating bus client")
+	}
+}
+
+func routeExists(routes gin.RoutesInfo, method string, path string) bool {
+	for _, route := range routes {
+		if route.Method == method && route.Path == path {
+			return true
+		}
+	}
+
+	return false
+}
+
+func withRepoRootAsWorkingDirectory(t *testing.T) {
+	t.Helper()
+
+	originalWorkingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("os.Getwd() error: %v", err)
+	}
+
+	if _, err = os.Stat(filepath.Join(originalWorkingDirectory, "templates")); err == nil {
+		return
+	}
+
+	repoRoot := filepath.Clean(filepath.Join(originalWorkingDirectory, ".."))
+	if _, err = os.Stat(filepath.Join(repoRoot, "templates")); err != nil {
+		t.Fatalf("could not locate templates directory from %q: %v", originalWorkingDirectory, err)
+	}
+
+	if err = os.Chdir(repoRoot); err != nil {
+		t.Fatalf("os.Chdir(%q) error: %v", repoRoot, err)
+	}
+
+	t.Cleanup(func() {
+		if chdirErr := os.Chdir(originalWorkingDirectory); chdirErr != nil {
+			t.Errorf("cleanup os.Chdir(%q) error: %v", originalWorkingDirectory, chdirErr)
+		}
+	})
 }

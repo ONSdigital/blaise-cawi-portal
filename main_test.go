@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"go.uber.org/zap"
@@ -61,5 +62,23 @@ func TestRunAppReturnsZeroOnSuccess(t *testing.T) {
 
 	if observedLogs.Len() != 0 {
 		t.Fatalf("expected no error logs, got %d", observedLogs.Len())
+	}
+}
+
+func TestRunReturnsErrorWhenConfigurationIsInvalid(t *testing.T) {
+	t.Setenv("SESSION_SECRET", "session-secret")
+	t.Setenv("ENCRYPTION_SECRET", "0123456789abcdef")
+	t.Setenv("CATI_URL", "https://cati.test")
+	t.Setenv("JWT_SECRET", "jwt-secret")
+	t.Setenv("BUS_URL", "")
+	t.Setenv("BUS_CLIENT_ID", "bus-client-id")
+	t.Setenv("BLAISE_REST_API", "https://rest.test")
+
+	err := run()
+	if err == nil {
+		t.Fatal("run() expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to load configuration") {
+		t.Fatalf("error = %q, want to contain %q", err.Error(), "failed to load configuration")
 	}
 }

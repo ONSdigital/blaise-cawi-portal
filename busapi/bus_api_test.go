@@ -53,4 +53,33 @@ func TestBusApiGetUacInfo(t *testing.T) {
 			t.Fatalf("UACInfo = %+v, want empty fields", uacInfo)
 		}
 	})
+
+	t.Run("returns empty UAC info and no error when API returns not found", func(t *testing.T) {
+		httpmock.Reset()
+		httpmock.RegisterResponder("POST", fmt.Sprintf("%s/uacs/uac", baseURL),
+			httpmock.NewBytesResponder(http.StatusNotFound, []byte{}))
+
+		uacInfo, err := api.GetUACInfo(context.Background(), uac)
+		if err != nil {
+			t.Fatalf("GetUACInfo() unexpected error: %v", err)
+		}
+		if uacInfo != (busapi.UACInfo{}) {
+			t.Fatalf("UACInfo = %+v, want empty", uacInfo)
+		}
+	})
+
+	t.Run("returns request creation error when base URL is invalid", func(t *testing.T) {
+		badAPI := &busapi.BUSAPI{BaseURL: "://invalid", Client: client}
+
+		uacInfo, err := badAPI.GetUACInfo(context.Background(), uac)
+		if err == nil {
+			t.Fatal("GetUACInfo() expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "unable to create UAC info request") {
+			t.Fatalf("error %q does not contain expected substring", err.Error())
+		}
+		if uacInfo != (busapi.UACInfo{}) {
+			t.Fatalf("UACInfo = %+v, want empty", uacInfo)
+		}
+	})
 }

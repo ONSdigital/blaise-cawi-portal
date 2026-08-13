@@ -40,6 +40,7 @@ var (
 	fontSrc               = fmt.Sprintf("font-src %s data:", srcHosts)
 	imgSrc                = fmt.Sprintf("img-src %s data:", srcHosts)
 	contentSecurityPolicy = fmt.Sprintf("%s; %s; %s", defaultSrc, fontSrc, imgSrc)
+	idTokenNewClient      = idtoken.NewClient
 )
 
 type Config struct {
@@ -258,7 +259,7 @@ func newHTTPClient() *http.Client {
 }
 
 func (server *Server) buildControllers(logger *zap.Logger) (*routerControllers, error) {
-	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientID)
+	client, err := idTokenNewClient(context.Background(), server.Config.BusClientID)
 	if err != nil {
 		return nil, err
 	}

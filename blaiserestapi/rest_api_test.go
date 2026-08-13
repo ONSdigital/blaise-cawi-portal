@@ -2,6 +2,7 @@ package blaiserestapi_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -59,6 +60,52 @@ func TestGetInstrumentSettings(t *testing.T) {
 		}
 		if instrumentSettings[0].SessionTimeout != 15 {
 			t.Fatalf("SessionTimeout = %d, want 15", instrumentSettings[0].SessionTimeout)
+		}
+	})
+
+	t.Run("returns error when base URL is invalid", func(t *testing.T) {
+		badAPI := &blaiserestapi.BlaiseRestAPI{
+			BaseURL:    "://invalid",
+			Serverpark: serverpark,
+			Client:     client,
+		}
+
+		instrumentSettings, err := badAPI.GetInstrumentSettings(context.Background(), instrumentName)
+		if err == nil {
+			t.Fatal("GetInstrumentSettings() expected error, got nil")
+		}
+		if err.Error() == "instrument not found" {
+			t.Fatalf("error = %q, expected request creation error", err.Error())
+		}
+		if instrumentSettings != nil {
+			t.Fatalf("instrumentSettings = %+v, want nil", instrumentSettings)
+		}
+	})
+
+	t.Run("returns error when downstream call fails", func(t *testing.T) {
+		httpmock.Reset()
+		httpmock.RegisterResponder("GET", url,
+			httpmock.NewErrorResponder(errors.New("downstream unavailable")))
+
+		instrumentSettings, err := blaiseRestAPI.GetInstrumentSettings(context.Background(), instrumentName)
+		if err == nil {
+			t.Fatal("GetInstrumentSettings() expected error, got nil")
+		}
+		if instrumentSettings != nil {
+			t.Fatalf("instrumentSettings = %+v, want nil", instrumentSettings)
+		}
+	})
+
+	t.Run("returns error when response body is invalid JSON", func(t *testing.T) {
+		httpmock.Reset()
+		httpmock.RegisterResponder("GET", url, httpmock.NewBytesResponder(http.StatusOK, []byte("not-json")))
+
+		instrumentSettings, err := blaiseRestAPI.GetInstrumentSettings(context.Background(), instrumentName)
+		if err == nil {
+			t.Fatal("GetInstrumentSettings() expected error, got nil")
+		}
+		if instrumentSettings != nil {
+			t.Fatalf("instrumentSettings = %+v, want nil", instrumentSettings)
 		}
 	})
 }
