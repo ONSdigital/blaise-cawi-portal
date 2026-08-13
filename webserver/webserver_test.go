@@ -271,10 +271,11 @@ func TestRegisterUtilityRoutesLanguageAndNoRoute(t *testing.T) {
 		method     string
 		path       string
 		wantStatus int
+		wantLoc    string
 	}{
 		{name: "welsh language", method: http.MethodPost, path: "/language/welsh", wantStatus: http.StatusOK},
 		{name: "english language", method: http.MethodPost, path: "/language/english", wantStatus: http.StatusOK},
-		{name: "get not allowed", method: http.MethodGet, path: "/language/welsh", wantStatus: http.StatusNotFound},
+		{name: "welsh language fallback via get", method: http.MethodGet, path: "/language/welsh", wantStatus: http.StatusSeeOther, wantLoc: "/"},
 	}
 
 	for _, tt := range tests {
@@ -289,14 +290,20 @@ func TestRegisterUtilityRoutesLanguageAndNoRoute(t *testing.T) {
 			if recorder.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", recorder.Code, tt.wantStatus)
 			}
+
+			if tt.wantLoc != "" {
+				if got := recorder.Header().Get("Location"); got != tt.wantLoc {
+					t.Fatalf("Location header = %q, want %q", got, tt.wantLoc)
+				}
+			}
 		})
 	}
 
-	if len(languageManager.setCalls) != 2 {
-		t.Fatalf("SetWelsh call count = %d, want 2", len(languageManager.setCalls))
+	if len(languageManager.setCalls) != 3 {
+		t.Fatalf("SetWelsh call count = %d, want 3", len(languageManager.setCalls))
 	}
-	if languageManager.setCalls[0] != true || languageManager.setCalls[1] != false {
-		t.Fatalf("SetWelsh calls = %v, want [true false]", languageManager.setCalls)
+	if languageManager.setCalls[0] != true || languageManager.setCalls[1] != false || languageManager.setCalls[2] != true {
+		t.Fatalf("SetWelsh calls = %v, want [true false true]", languageManager.setCalls)
 	}
 
 	recorder := httptest.NewRecorder()

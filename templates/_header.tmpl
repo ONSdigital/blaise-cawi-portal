@@ -257,9 +257,9 @@
                         <ul class="ons-language-links">
                             <li class="ons-language-links__item">
                                 {{if .welsh}}
-                                <a onclick='toggleEnglish()' lang="en">English</a>
+                                <a href="/language/english" onclick='toggleEnglish(); return false;' lang="en">English</a>
                                 {{else}}
-                                <a onclick='toggleWelsh()' lang="cy">Cymraeg</a>
+                                <a href="/language/welsh" onclick='toggleWelsh(); return false;' lang="cy">Cymraeg</a>
                                 {{end}}
                             </li>
                         </ul>

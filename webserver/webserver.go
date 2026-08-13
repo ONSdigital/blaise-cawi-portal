@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -324,13 +325,43 @@ func registerControllerRoutes(httpRouter *gin.Engine, controllers *routerControl
 func registerUtilityRoutes(httpRouter *gin.Engine, authController *AuthController, languageManager languagemanager.LanguageManagerInterface) {
 	httpRouter.GET("/", authController.LoginEndpoint)
 
-	httpRouter.POST("/language/:lang", func(context *gin.Context) {
+	setLanguage := func(context *gin.Context) {
 		if strings.ToLower(context.Param("lang")) == "welsh" {
 			languageManager.SetWelsh(context, true)
 		} else {
 			languageManager.SetWelsh(context, false)
 		}
+	}
+
+	redirectToReferrerOrRoot := func(context *gin.Context) {
+		referer := context.Request.Referer()
+		if referer == "" {
+			context.Redirect(http.StatusSeeOther, "/")
+			return
+		}
+
+		refererURL, err := url.Parse(referer)
+		if err != nil || refererURL.Path == "" {
+			context.Redirect(http.StatusSeeOther, "/")
+			return
+		}
+
+		target := refererURL.Path
+		if refererURL.RawQuery != "" {
+			target = fmt.Sprintf("%s?%s", target, refererURL.RawQuery)
+		}
+
+		context.Redirect(http.StatusSeeOther, target)
+	}
+
+	httpRouter.POST("/language/:lang", func(context *gin.Context) {
+		setLanguage(context)
 		context.Status(http.StatusOK)
+	})
+
+	httpRouter.GET("/language/:lang", func(context *gin.Context) {
+		setLanguage(context)
+		redirectToReferrerOrRoot(context)
 	})
 
 	httpRouter.NoRoute(func(context *gin.Context) {
