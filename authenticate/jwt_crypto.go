@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-//go:generate mockery --name JWTCryptoInterface
+//go:generate mockery
 type JWTCryptoInterface interface {
 	EncryptJWT(string, *busapi.UACInfo, int) (string, error)
 	DecryptJWT(interface{}) (*UACClaims, error)

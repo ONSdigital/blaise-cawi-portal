@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-//go:generate mockery --name BUSAPIInterface
+//go:generate mockery
 type BUSAPIInterface interface {
 	GetUACInfo(context.Context, string) (UACInfo, error)
 }

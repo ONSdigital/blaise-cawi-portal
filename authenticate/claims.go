@@ -49,10 +49,10 @@ func (uacClaims *UACClaims) LogFields() []zap.Field {
 }
 
 func CaseIDFingerprint(caseID string) string {
-	normalized := strings.TrimSpace(strings.ToLower(caseID))
-	if normalized == "" {
+	normalised := strings.TrimSpace(strings.ToLower(caseID))
+	if normalised == "" {
 		return "unknown"
 	}
-	hash := sha256.Sum256([]byte(normalized))
+	hash := sha256.Sum256([]byte(normalised))
 	return hex.EncodeToString(hash[:])[:12]
 }

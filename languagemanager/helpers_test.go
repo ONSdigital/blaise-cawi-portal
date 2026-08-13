@@ -15,7 +15,7 @@ func TestGetLangFromQuery(t *testing.T) {
 		path     string
 		expected string
 	}{
-		{name: "normalizes uppercase", path: "/?lang=CY", expected: "cy"},
+		{name: "normalises uppercase", path: "/?lang=CY", expected: "cy"},
 		{name: "supports mixed case", path: "/?lang=En", expected: "en"},
 		{name: "returns empty string if query missing", path: "/", expected: ""},
 	}

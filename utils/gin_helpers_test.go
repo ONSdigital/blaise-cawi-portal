@@ -58,26 +58,26 @@ func TestGetRequestSource(t *testing.T) {
 func TestSanitiseLogInput(t *testing.T) {
 	t.Run("removes line breaks tabs and non printable characters", func(t *testing.T) {
 		input := "row1\nrow2\r\trow3\x00\x1f"
-		sanitized := utils.SanitiseLogInput(input)
-		if sanitized != "row1row2row3" {
-			t.Fatalf("SanitiseLogInput() = %q, want %q", sanitized, "row1row2row3")
+		sanitised := utils.SanitiseLogInput(input)
+		if sanitised != "row1row2row3" {
+			t.Fatalf("SanitiseLogInput() = %q, want %q", sanitised, "row1row2row3")
 		}
 	})
 
 	t.Run("escapes html characters", func(t *testing.T) {
 		input := `<script>alert("x")</script>`
-		sanitized := utils.SanitiseLogInput(input)
+		sanitised := utils.SanitiseLogInput(input)
 		expected := "&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt;"
-		if sanitized != expected {
-			t.Fatalf("SanitiseLogInput() = %q, want %q", sanitized, expected)
+		if sanitised != expected {
+			t.Fatalf("SanitiseLogInput() = %q, want %q", sanitised, expected)
 		}
 	})
 
 	t.Run("keeps printable unicode", func(t *testing.T) {
 		input := "Arolygon Cymru"
-		sanitized := utils.SanitiseLogInput(input)
-		if sanitized != input {
-			t.Fatalf("SanitiseLogInput() = %q, want %q", sanitized, input)
+		sanitised := utils.SanitiseLogInput(input)
+		if sanitised != input {
+			t.Fatalf("SanitiseLogInput() = %q, want %q", sanitised, input)
 		}
 	})
 }

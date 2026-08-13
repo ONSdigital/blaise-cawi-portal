@@ -1,21 +1,46 @@
 window.addEventListener('click', function(event) {
   event = event || window.event;
   var target = event.target || event.srcElement;
-  if (
-    target.getAttribute("role") == "button" ||
-    target.tagName == "button" ||
-    target.parentElement.getAttribute("role") == "button" ||
-    target.parentElement.tagName == "button"
-  ) {
+
+  if (target && target.nodeType === 3) {
+    target = target.parentElement;
+  }
+
+  var buttonTarget = null;
+  var current = target;
+
+  while (current) {
+    var role = current.getAttribute ? (current.getAttribute("role") || "").toLowerCase() : "";
+    var tagName = current.tagName ? current.tagName.toLowerCase() : "";
+
+    if (role === "button" || tagName === "button") {
+      buttonTarget = current;
+      break;
+    }
+
+    current = current.parentElement;
+  }
+
+  if (buttonTarget) {
+    var buttonText = (buttonTarget.innerText || buttonTarget.textContent || "").toLowerCase();
+
     if (
-      target.innerText.toLowerCase() !== "save and sign out"
+      buttonText !== "save and sign out"
     ) {
-      var xmlHttp = new XMLHttpRequest
-      xmlHttp.open("GET", "/auth/logged-in", false);
-      xmlHttp.send(null);
-      if (xmlHttp.status !== 200) {
-        this.window.location.replace("/auth/timed-out");
+      var xmlHttp = new XMLHttpRequest();
+
+      xmlHttp.onreadystatechange = function() {
+        if (xmlHttp.readyState === 4 && xmlHttp.status !== 200) {
+          window.location.replace("/auth/timed-out");
+        }
       };
+
+      xmlHttp.onerror = function() {
+        window.location.replace("/auth/timed-out");
+      };
+
+      xmlHttp.open("GET", "/auth/logged-in", true);
+      xmlHttp.send(null);
     };
   };
 }, false);

@@ -43,7 +43,7 @@ var (
 	}
 )
 
-//go:generate mockery --name AuthInterface
+//go:generate mockery
 type AuthInterface interface {
 	AuthenticatedWithUAC(*gin.Context)
 	IsUAC16() bool

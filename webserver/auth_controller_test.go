@@ -58,7 +58,6 @@ func newAuthControllerHarness(t *testing.T) *authControllerHarness {
 		Auth:            mockAuth,
 		CSRFManager:     csrfManager,
 		LanguageManager: languageManagerMock,
-		Logger:          observedLogger,
 	}
 	authController.AddRoutes(router)
 
@@ -254,48 +253,21 @@ func TestAuthControllerPostLoginEndpoint(t *testing.T) {
 		h.mockAuth.AssertNumberOfCalls(t, "Login", 1)
 	})
 
-	t.Run("invalid UAC shows mode-specific message", func(t *testing.T) {
-		t.Run("12-digit mode", func(t *testing.T) {
-			h := newAuthControllerHarness(t)
-			h.mockAuth.On("IsUAC16").Return(false)
-			h.config.UACKind = "uac"
-			h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
-			h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-			csrfToken, cookieHeader := h.csrfTokenAndCookie(t)
+	t.Run("invalid UAC delegates validation to auth.Login", func(t *testing.T) {
+		h := newAuthControllerHarness(t)
+		h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
+		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
+		csrfToken, cookieHeader := h.csrfTokenAndCookie(t)
 
-			data := url.Values{"uac": []string{"123"}, "_csrf": []string{csrfToken}}
-			recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Cookie": cookieHeader})
-			if err != nil {
-				t.Fatalf("post(/auth/login) error: %v", err)
-			}
-			if recorder.Code != http.StatusForbidden {
-				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
-			}
-			if !strings.Contains(recorder.Body.String(), `Enter your 12-digit access code`) {
-				t.Fatalf("unexpected response body: %s", recorder.Body.String())
-			}
-		})
-
-		t.Run("16-character mode", func(t *testing.T) {
-			h := newAuthControllerHarness(t)
-			h.mockAuth.On("IsUAC16").Return(true)
-			h.config.UACKind = "uac16"
-			h.mockAuth.On("Login", mock.Anything, mock.Anything).Return()
-			h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
-			csrfToken, cookieHeader := h.csrfTokenAndCookie(t)
-
-			data := url.Values{"uac": []string{"123"}, "_csrf": []string{csrfToken}}
-			recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Cookie": cookieHeader})
-			if err != nil {
-				t.Fatalf("post(/auth/login) error: %v", err)
-			}
-			if recorder.Code != http.StatusForbidden {
-				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
-			}
-			if !strings.Contains(recorder.Body.String(), `Enter your 16-character access code`) {
-				t.Fatalf("unexpected response body: %s", recorder.Body.String())
-			}
-		})
+		data := url.Values{"uac": []string{"123"}, "_csrf": []string{csrfToken}}
+		recorder, err := h.post("/auth/login", data.Encode(), map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Cookie": cookieHeader})
+		if err != nil {
+			t.Fatalf("post(/auth/login) error: %v", err)
+		}
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		h.mockAuth.AssertNumberOfCalls(t, "Login", 1)
 	})
 }
 
@@ -327,7 +299,7 @@ func TestAuthControllerLoggedInEndpoint(t *testing.T) {
 		}
 	})
 
-	t.Run("returns unauthorized when no active session", func(t *testing.T) {
+	t.Run("returns unauthorised when no active session", func(t *testing.T) {
 		h := newAuthControllerHarness(t)
 		h.mockAuth.On("HasSession", mock.Anything).Return(false, nil)
 		recorder, err := h.get("/auth/logged-in")

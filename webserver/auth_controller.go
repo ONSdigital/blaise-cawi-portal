@@ -3,7 +3,6 @@ package webserver
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/csrf"
@@ -11,12 +10,10 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 type AuthController struct {
 	Auth            authenticate.AuthInterface
-	Logger          *zap.Logger
 	CSRFManager     csrf.CSRFManager
 	LanguageManager languagemanager.LanguageManagerInterface
 }
@@ -58,31 +55,6 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 
 func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
 	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
-
-	uac := strings.ReplaceAll(context.PostForm("uac"), " ", "")
-	if uac != "" {
-		isUAC16 := authController.Auth.IsUAC16()
-		expectedLen, lengthDesc, welshDesc := 12, "12-digit", "12 o nodau"
-		if isUAC16 {
-			expectedLen, lengthDesc, welshDesc = 16, "16-character", "16 o nodau"
-		}
-		if len(uac) != expectedLen {
-			var errMsg string
-			if authController.LanguageManager.IsWelsh(context) {
-				errMsg = fmt.Sprintf(authenticate.INVALID_LENGTH_ERR["welsh"], welshDesc)
-			} else {
-				errMsg = fmt.Sprintf(authenticate.INVALID_LENGTH_ERR["english"], lengthDesc)
-			}
-			context.HTML(http.StatusForbidden, "login.tmpl", gin.H{
-				"error":      errMsg,
-				"uac16":      isUAC16,
-				"csrf_token": authController.CSRFManager.GetToken(context),
-				"welsh":      authController.LanguageManager.IsWelsh(context),
-			})
-			context.Abort()
-			return
-		}
-	}
 
 	authController.Auth.Login(context, session)
 }

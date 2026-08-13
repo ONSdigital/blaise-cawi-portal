@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate mockery --name BlaiseRestAPIInterface
+//go:generate mockery
 type BlaiseRestAPIInterface interface {
 	GetInstrumentSettings(context.Context, string) (InstrumentSettings, error)
 }

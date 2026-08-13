@@ -222,7 +222,7 @@ func TestInstrumentOpenCase(t *testing.T) {
 		}
 	})
 
-	t.Run("non-200 from blaise returns internal server error", func(t *testing.T) {
+	t.Run("non-200 from Blaise returns internal server error", func(t *testing.T) {
 		h := newInstrumentHarness(t)
 		h.languageManagerMock.On("IsWelsh", mock.Anything).Return(false)
 		httpmock.RegisterResponder("POST", fmt.Sprintf("%s/%s/default.aspx", h.catiURL, h.instrumentName), httpmock.NewJsonResponderOrPanic(http.StatusInternalServerError, "Sad face"))
@@ -242,7 +242,7 @@ func TestInstrumentOpenCase(t *testing.T) {
 			t.Fatalf("log count = %d, want 1", h.observedLogs.Len())
 		}
 		entry := h.observedLogs.All()[0]
-		if entry.Message != "Error launching blaise study, invalid status code" || entry.ContextMap()["AuthedCaseIDFingerprint"] != "4ee36d70199f" || entry.ContextMap()["AuthedInstrumentName"] != h.instrumentName || entry.ContextMap()["RespStatusCode"] != int64(500) || entry.ContextMap()["RespBodyBytes"] != int64(10) || entry.Level != zap.ErrorLevel {
+		if entry.Message != "Error launching Blaise study, invalid status code" || entry.ContextMap()["AuthedCaseIDFingerprint"] != "4ee36d70199f" || entry.ContextMap()["AuthedInstrumentName"] != h.instrumentName || entry.ContextMap()["RespStatusCode"] != int64(500) || entry.ContextMap()["RespBodyBytes"] != int64(10) || entry.Level != zap.ErrorLevel {
 			t.Fatalf("unexpected log entry: %+v", entry)
 		}
 	})

@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate mockery --name LanguageManagerInterface
+//go:generate mockery
 type LanguageManagerInterface interface {
 	IsWelsh(*gin.Context) bool
 	SetWelsh(*gin.Context, bool)

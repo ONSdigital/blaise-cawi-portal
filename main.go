@@ -23,7 +23,10 @@ func main() {
 	}
 
 	server := &webserver.Server{Config: config}
-	httpRouter := server.SetupRouter()
+	httpRouter, err := server.SetupRouter()
+	if err != nil {
+		zap.L().Fatal("Failed to set up router", zap.Error(err))
+	}
 	defer func() {
 		_ = zap.L().Sync()
 	}()

@@ -75,12 +75,12 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 		return nil, fmt.Errorf("failed to decrypt JWT for instrument auth: %w", err)
 	}
 	instrumentName := context.Param("instrumentName")
-	sanitizedInstrumentName := utils.SanitiseLogInput(instrumentName)
+	sanitisedInstrumentName := utils.SanitiseLogInput(instrumentName)
 	if !uacClaim.AuthenticatedForInstrument(instrumentName) {
 		instrumentController.logger().Info("Not authenticated for instrument",
-			append(uacClaim.LogFields(), zap.String("InstrumentName", sanitizedInstrumentName))...)
+			append(uacClaim.LogFields(), zap.String("InstrumentName", sanitisedInstrumentName))...)
 		authenticate.Forbidden(context, instrumentController.LanguageManager.IsWelsh(context))
-		return nil, fmt.Errorf("authentication failed for instrument %q: %w", sanitizedInstrumentName, errForbiddenInstrumentAccess)
+		return nil, fmt.Errorf("authentication failed for instrument %q: %w", sanitisedInstrumentName, errForbiddenInstrumentAccess)
 	}
 	if isAPICall(context) {
 		instrumentController.Auth.RefreshToken(context, session, uacClaim)
@@ -91,11 +91,14 @@ func (instrumentController *InstrumentController) instrumentAuth(context *gin.Co
 func (instrumentController *InstrumentController) openCase(context *gin.Context) {
 	uacClaim, err := instrumentController.instrumentAuth(context)
 	if err != nil {
+		if errors.Is(err, errForbiddenInstrumentAccess) {
+			return
+		}
 		return
 	}
 	resp, err := instrumentController.launchCase(context, uacClaim)
 	if err != nil {
-		instrumentController.logger().Error("Error launching blaise study", append(uacClaim.LogFields(), zap.Error(err))...)
+		instrumentController.logger().Error("Error launching Blaise study", append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
@@ -103,14 +106,14 @@ func (instrumentController *InstrumentController) openCase(context *gin.Context)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		instrumentController.logger().Error("Error launching blaise study, cannot read response body",
+		instrumentController.logger().Error("Error launching Blaise study, cannot read response body",
 			append(uacClaim.LogFields(), zap.Error(err))...)
 		InternalServerError(context, instrumentController.LanguageManager.IsWelsh(context))
 		return
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		instrumentController.logger().Error("Error launching blaise study, invalid status code",
+		instrumentController.logger().Error("Error launching Blaise study, invalid status code",
 			append(uacClaim.LogFields(),
 				zap.Int("RespStatusCode", resp.StatusCode),
 				zap.Int("RespBodyBytes", len(body)),
@@ -168,6 +171,9 @@ func (instrumentController *InstrumentController) launchCase(context *gin.Contex
 func (instrumentController *InstrumentController) proxyWithInstrumentAuth(context *gin.Context) {
 	uacClaim, err := instrumentController.instrumentAuth(context)
 	if err != nil {
+		if errors.Is(err, errForbiddenInstrumentAccess) {
+			return
+		}
 		return
 	}
 	path := context.Param("path")

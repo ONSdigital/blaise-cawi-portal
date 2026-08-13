@@ -178,14 +178,15 @@ type Server struct {
 	Config *Config
 }
 
-func (server *Server) SetupRouter() *gin.Engine {
-	logger, err := NewLogger(server.Config)
-	if err != nil {
-		zap.L().Fatal("error setting up logger", zap.Error(err))
-	}
-	httpRouter := gin.Default()
-	httpClient := &http.Client{Timeout: httpClientTimeout}
+type routerControllers struct {
+	authController       *AuthController
+	instrumentController *InstrumentController
+	securityController   *SecurityController
+	healthController     *HealthController
+	languageManager      languagemanager.LanguageManagerInterface
+}
 
+func (server *Server) configureSecurityMiddleware(httpRouter *gin.Engine) {
 	securityConfig := secure.DefaultConfig()
 	securityConfig.ContentSecurityPolicy = contentSecurityPolicy
 
@@ -194,29 +195,29 @@ func (server *Server) SetupRouter() *gin.Engine {
 	}
 
 	httpRouter.Use(secure.New(securityConfig))
+}
 
+func newCookieSessionStore(config *Config, maxAgeSeconds int) sessions.Store {
+	store := cookie.NewStore([]byte(config.SessionSecret), []byte(config.EncryptionSecret))
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   maxAgeSeconds,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	return store
+}
+
+func (server *Server) configureSessionMiddleware(httpRouter *gin.Engine) error {
 	store, err := UserSessionStore(server.Config)
 	if err != nil {
-		logger.Fatal("Could not connect to session database", zap.Error(err))
+		return err
 	}
 
-	cookieStore := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
-	cookieStore.Options(sessions.Options{
-		Path:     "/",
-		MaxAge:   60 * 60 * 24 * 30, // 30 days
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-	})
-
-	languageStore := cookie.NewStore([]byte(server.Config.SessionSecret), []byte(server.Config.EncryptionSecret))
-	languageStore.Options(sessions.Options{
-		Path:     "/",
-		MaxAge:   60 * 60 * 24 * 365, // 365 days
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-	})
+	cookieStore := newCookieSessionStore(server.Config, 60*60*24*30)
+	languageStore := newCookieSessionStore(server.Config, 60*60*24*365)
 
 	sessionStores := []sessions.SessionStore{
 		{
@@ -236,19 +237,29 @@ func (server *Server) SetupRouter() *gin.Engine {
 			Store: languageStore,
 		},
 	}
+
 	httpRouter.Use(sessions.SessionsManyStores(sessionStores))
 
-	// This router has access to all templates in the templates folder
+	return nil
+}
+
+func configureTemplateAndStaticContent(httpRouter *gin.Engine) {
 	httpRouter.TrustedPlatform = gin.PlatformGoogleAppEngine
 	httpRouter.SetFuncMap(template.FuncMap{
 		"WrapWelsh": WrapWelsh,
 	})
 	httpRouter.LoadHTMLGlob("templates/*")
 	httpRouter.Static("/assets", "./assets")
+}
 
+func newHTTPClient() *http.Client {
+	return &http.Client{Timeout: httpClientTimeout}
+}
+
+func (server *Server) buildControllers(logger *zap.Logger) (*routerControllers, error) {
 	client, err := idtoken.NewClient(context.Background(), server.Config.BusClientID)
 	if err != nil {
-		logger.Fatal("Error creating bus client", zap.Error(err))
+		return nil, err
 	}
 
 	jwtCrypto := &authenticate.JWTCrypto{
@@ -258,7 +269,7 @@ func (server *Server) SetupRouter() *gin.Engine {
 	blaiseRestApi := &blaiserestapi.BlaiseRestAPI{
 		BaseURL:    server.Config.BlaiseRestAPI,
 		Serverpark: server.Config.Serverpark,
-		Client:     &http.Client{Timeout: httpClientTimeout},
+		Client:     newHTTPClient(),
 		Logger:     logger,
 	}
 
@@ -280,32 +291,40 @@ func (server *Server) SetupRouter() *gin.Engine {
 
 	authController := &AuthController{
 		Auth:            auth,
-		Logger:          logger,
 		CSRFManager:     csrfManager,
 		LanguageManager: languageManager,
 	}
 
-	securityController := &SecurityController{}
-
-	securityController.AddRoutes(httpRouter)
-
-	authController.AddRoutes(httpRouter)
 	instrumentController := &InstrumentController{
 		Auth:            auth,
 		JWTCrypto:       jwtCrypto,
 		Logger:          logger,
 		CatiURL:         server.Config.CatiURL,
-		HttpClient:      httpClient,
+		HttpClient:      newHTTPClient(),
 		Debug:           server.Config.Debug,
 		LanguageManager: languageManager,
 	}
-	instrumentController.AddRoutes(httpRouter)
-	healthController := &HealthController{}
-	healthController.AddRoutes(httpRouter)
 
+	return &routerControllers{
+		authController:       authController,
+		instrumentController: instrumentController,
+		securityController:   &SecurityController{},
+		healthController:     &HealthController{},
+		languageManager:      languageManager,
+	}, nil
+}
+
+func registerControllerRoutes(httpRouter *gin.Engine, controllers *routerControllers) {
+	controllers.securityController.AddRoutes(httpRouter)
+	controllers.authController.AddRoutes(httpRouter)
+	controllers.instrumentController.AddRoutes(httpRouter)
+	controllers.healthController.AddRoutes(httpRouter)
+}
+
+func registerUtilityRoutes(httpRouter *gin.Engine, authController *AuthController, languageManager languagemanager.LanguageManagerInterface) {
 	httpRouter.GET("/", authController.LoginEndpoint)
 
-	httpRouter.Any("/language/:lang", func(context *gin.Context) {
+	httpRouter.POST("/language/:lang", func(context *gin.Context) {
 		if strings.ToLower(context.Param("lang")) == "welsh" {
 			languageManager.SetWelsh(context, true)
 		} else {
@@ -317,6 +336,30 @@ func (server *Server) SetupRouter() *gin.Engine {
 	httpRouter.NoRoute(func(context *gin.Context) {
 		context.HTML(http.StatusNotFound, "not_found.tmpl", gin.H{"welsh": languageManager.IsWelsh(context)})
 	})
+}
 
-	return httpRouter
+func (server *Server) SetupRouter() (*gin.Engine, error) {
+	logger, err := NewLogger(server.Config)
+	if err != nil {
+		return nil, fmt.Errorf("error setting up logger: %w", err)
+	}
+
+	httpRouter := gin.Default()
+	server.configureSecurityMiddleware(httpRouter)
+
+	if err := server.configureSessionMiddleware(httpRouter); err != nil {
+		return nil, fmt.Errorf("could not connect to session database: %w", err)
+	}
+
+	configureTemplateAndStaticContent(httpRouter)
+
+	controllers, err := server.buildControllers(logger)
+	if err != nil {
+		return nil, fmt.Errorf("error creating bus client: %w", err)
+	}
+
+	registerControllerRoutes(httpRouter, controllers)
+	registerUtilityRoutes(httpRouter, controllers.authController, controllers.languageManager)
+
+	return httpRouter, nil
 }
