@@ -425,3 +425,35 @@ func TestInstrumentProxyInternals(t *testing.T) {
 		}
 	})
 }
+
+func TestInstrumentRefreshTokenAPIDetection(t *testing.T) {
+	t.Run("refreshes token when api appears as nested path segment", func(t *testing.T) {
+		h := newInstrumentHarness(t)
+		h.mockAuth.On("AuthenticatedWithUAC", mock.Anything).Return()
+		h.mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(authedClaims(h.instrumentName, h.caseID), nil)
+
+		httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/questionnaire/api/health", h.catiURL, h.instrumentName), httpmock.NewStringResponder(http.StatusOK, h.responseInfo))
+
+		recorder := h.get(t, fmt.Sprintf("/%s/questionnaire/api/health", h.instrumentName))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+
+		h.mockAuth.AssertNumberOfCalls(t, "RefreshToken", 1)
+	})
+
+	t.Run("does not refresh token when api is not a distinct segment", func(t *testing.T) {
+		h := newInstrumentHarness(t)
+		h.mockAuth.On("AuthenticatedWithUAC", mock.Anything).Return()
+		h.mockJWTCrypto.On("DecryptJWT", mock.Anything).Return(authedClaims(h.instrumentName, h.caseID), nil)
+
+		httpmock.RegisterResponder("GET", fmt.Sprintf("%s/%s/capi/health", h.catiURL, h.instrumentName), httpmock.NewStringResponder(http.StatusOK, h.responseInfo))
+
+		recorder := h.get(t, fmt.Sprintf("/%s/capi/health", h.instrumentName))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+
+		h.mockAuth.AssertNumberOfCalls(t, "RefreshToken", 0)
+	})
+}

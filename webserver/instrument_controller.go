@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/blaise"
@@ -156,7 +157,7 @@ func (instrumentController *InstrumentController) launchCase(context *gin.Contex
 			return nil, err
 		}
 
-		// TODO(Blaise 5.16 upgrade): delete this 404 fallback branch when default.aspx is retired.
+		// TODO (Blaise 5.16 upgrade): delete this 404 fallback branch when default.aspx is retired.
 		if resp.StatusCode == http.StatusNotFound && path != "" {
 			resp.Body.Close()
 			continue
@@ -245,7 +246,18 @@ func isStartInterviewUrl(path, resource string) bool {
 }
 
 func isAPICall(context *gin.Context) bool {
-	return context.Param("path") == "api" || context.Param("resource") == "api"
+	combinedPath := strings.Trim(context.Param("path")+context.Param("resource"), "/")
+	if combinedPath == "" {
+		return false
+	}
+
+	for _, segment := range strings.Split(combinedPath, "/") {
+		if strings.EqualFold(segment, "api") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func InjectScript(body []byte) (*html.Node, error) {
