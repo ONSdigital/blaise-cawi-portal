@@ -59,7 +59,7 @@ type Config struct {
 	DevMode bool `default:"false" split_words:"true"`
 	// EnableHTTPS keeps Secure cookies enabled in DevMode when running local HTTPS.
 	EnableHTTPS bool `default:"false" split_words:"true"`
-	Debug   bool `default:"false"`
+	Debug       bool `default:"false"`
 }
 
 func (config *Config) Validate() error {
