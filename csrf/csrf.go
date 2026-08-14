@@ -109,7 +109,7 @@ func (csrfManager *DefaultCSRFManager) GetToken(c *gin.Context) string {
 	}
 
 	salt, ok := session.Get(csrfSalt).(string)
-	if !ok {
+	if !ok || len(salt) == 0 {
 		salt = uniuri.New()
 		session.Set(csrfSalt, salt)
 		if err := session.Save(); err != nil {

@@ -27,6 +27,50 @@ func (failSession) Flashes(vars ...string) []interface{}       { return nil }
 func (failSession) Options(sessions.Options)                   {}
 func (failSession) Save() error                                { return errors.New("store unavailable") }
 
+// mapSession is a minimal in-memory session for token-generation tests.
+type mapSession struct {
+	values    map[interface{}]interface{}
+	saveCalls int
+}
+
+func (m *mapSession) ID() string { return "" }
+
+func (m *mapSession) Get(key interface{}) interface{} {
+	if m.values == nil {
+		return nil
+	}
+
+	return m.values[key]
+}
+
+func (m *mapSession) Set(key interface{}, val interface{}) {
+	if m.values == nil {
+		m.values = make(map[interface{}]interface{})
+	}
+
+	m.values[key] = val
+}
+
+func (m *mapSession) Delete(key interface{}) {
+	if m.values == nil {
+		return
+	}
+
+	delete(m.values, key)
+}
+
+func (m *mapSession) Clear() {
+	m.values = make(map[interface{}]interface{})
+}
+
+func (m *mapSession) AddFlash(value interface{}, vars ...string) {}
+func (m *mapSession) Flashes(vars ...string) []interface{}       { return nil }
+func (m *mapSession) Options(sessions.Options)                   {}
+func (m *mapSession) Save() error {
+	m.saveCalls++
+	return nil
+}
+
 func buildRouter(csrfManager *DefaultCSRFManager) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -275,5 +319,33 @@ func TestGetTokenAbortsWithInternalServerErrorOnSessionSaveFailure(t *testing.T)
 	}
 	if recorder.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, recorder.Code)
+	}
+}
+
+func TestGetTokenRegeneratesSaltWhenStoredSaltIsEmptyString(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	csrfManager := &DefaultCSRFManager{Secret: "secret"}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/token", nil)
+
+	session := &mapSession{values: map[interface{}]interface{}{csrfSalt: ""}}
+	c.Set(sessions.DefaultKey, session)
+
+	token := csrfManager.GetToken(c)
+
+	if token == "" {
+		t.Fatal("expected a non-empty token")
+	}
+	if token == tokenize(csrfManager.Secret, "") {
+		t.Fatal("expected token to be regenerated from a new salt, not empty salt")
+	}
+	storedSalt, ok := session.Get(csrfSalt).(string)
+	if !ok || storedSalt == "" {
+		t.Fatal("expected empty stored salt to be replaced with a new value")
+	}
+	if session.saveCalls != 1 {
+		t.Fatalf("expected session to be saved once, got %d", session.saveCalls)
 	}
 }
