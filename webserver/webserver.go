@@ -57,6 +57,8 @@ type Config struct {
 	UACKind          string `default:"uac" split_words:"true"`
 	// DevMode switches the session backend to cookie store (no Redis) and relaxes security middleware; it does not affect log verbosity.
 	DevMode bool `default:"false" split_words:"true"`
+	// EnableHTTPS keeps Secure cookies enabled in DevMode when running local HTTPS.
+	EnableHTTPS bool `default:"false" split_words:"true"`
 	Debug   bool `default:"false"`
 }
 
@@ -164,10 +166,14 @@ func UserSessionStore(config *Config) (sessions.Store, error) {
 		Path:     "/",
 		MaxAge:   60 * 60 * 24, // 1 day
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   shouldUseSecureCookies(config),
 		SameSite: http.SameSiteStrictMode,
 	})
 	return store, nil
+}
+
+func shouldUseSecureCookies(config *Config) bool {
+	return !config.DevMode || config.EnableHTTPS
 }
 
 func WrapWelsh(welsh bool) gin.H {
@@ -205,7 +211,7 @@ func newCookieSessionStore(config *Config, maxAgeSeconds int) sessions.Store {
 		Path:     "/",
 		MaxAge:   maxAgeSeconds,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   shouldUseSecureCookies(config),
 		SameSite: http.SameSiteStrictMode,
 	})
 
@@ -323,6 +329,26 @@ func registerControllerRoutes(httpRouter *gin.Engine, controllers *routerControl
 	controllers.healthController.AddRoutes(httpRouter)
 }
 
+func isSafeAbsoluteRedirectPath(path string) bool {
+	if path == "" {
+		return false
+	}
+
+	if !strings.HasPrefix(path, "/") {
+		return false
+	}
+
+	return !strings.HasPrefix(path, "//")
+}
+
+func isSameHostReferer(refererURL *url.URL, requestHost string) bool {
+	if refererURL.Host == "" {
+		return true
+	}
+
+	return strings.EqualFold(refererURL.Host, requestHost)
+}
+
 func registerUtilityRoutes(httpRouter *gin.Engine, authController *AuthController, languageManager languagemanager.LanguageManagerInterface) {
 	httpRouter.GET("/", authController.LoginEndpoint)
 
@@ -342,7 +368,17 @@ func registerUtilityRoutes(httpRouter *gin.Engine, authController *AuthControlle
 		}
 
 		refererURL, err := url.Parse(referer)
-		if err != nil || refererURL.Path == "" {
+		if err != nil {
+			context.Redirect(http.StatusSeeOther, "/")
+			return
+		}
+
+		if !isSameHostReferer(refererURL, context.Request.Host) {
+			context.Redirect(http.StatusSeeOther, "/")
+			return
+		}
+
+		if !isSafeAbsoluteRedirectPath(refererURL.Path) {
 			context.Redirect(http.StatusSeeOther, "/")
 			return
 		}

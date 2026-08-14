@@ -3,6 +3,7 @@ package busapi_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -10,6 +11,16 @@ import (
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
 	"github.com/jarcoal/httpmock"
 )
+
+type trackingReadCloser struct {
+	io.Reader
+	closed bool
+}
+
+func (r *trackingReadCloser) Close() error {
+	r.closed = true
+	return nil
+}
 
 func TestBusApiGetUacInfo(t *testing.T) {
 	baseURL := "http://localhost"
@@ -65,6 +76,30 @@ func TestBusApiGetUacInfo(t *testing.T) {
 		}
 		if uacInfo != (busapi.UACInfo{}) {
 			t.Fatalf("UACInfo = %+v, want empty", uacInfo)
+		}
+	})
+
+	t.Run("closes response body when API returns not found", func(t *testing.T) {
+		httpmock.Reset()
+		body := &trackingReadCloser{Reader: strings.NewReader("")}
+		httpmock.RegisterResponder("POST", fmt.Sprintf("%s/uacs/uac", baseURL),
+			func(*http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Body:       body,
+					Header:     make(http.Header),
+				}, nil
+			})
+
+		uacInfo, err := api.GetUACInfo(context.Background(), uac)
+		if err != nil {
+			t.Fatalf("GetUACInfo() unexpected error: %v", err)
+		}
+		if uacInfo != (busapi.UACInfo{}) {
+			t.Fatalf("UACInfo = %+v, want empty", uacInfo)
+		}
+		if !body.closed {
+			t.Fatal("expected response body to be closed")
 		}
 	})
 

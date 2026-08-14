@@ -30,6 +30,9 @@ func (busApi *BUSAPI) GetUACInfo(ctx context.Context, uac string) (UACInfo, erro
 	}
 
 	if response.StatusCode == http.StatusNotFound {
+		if response.Body != nil {
+			_ = response.Body.Close()
+		}
 		return UACInfo{}, nil
 	}
 

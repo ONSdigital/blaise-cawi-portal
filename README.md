@@ -54,6 +54,7 @@ Unix (only need to change `BLAISE_ENV`):
 ```sh
 export BLAISE_ENV=dev-sandbox123
 export DEV_MODE=true
+export ENABLE_HTTPS=false # set to true only when running locally over HTTPS
 export DEBUG=false # set to true to enable proxy debug transport logging
 export BUS_CLIENT_ID=$(gcloud app versions describe $(gcloud app versions list --service="cawi-portal" --sort-by="~version.createTime" --limit=1 --format="value(id)") --service="cawi-portal" --format="value(envVariables.BUS_CLIENT_ID)")
 export BUS_URL="https://${BLAISE_ENV}-bus.social-surveys.gcp.onsdigital.uk"
@@ -72,6 +73,7 @@ App Engine -> Versions -> cawi-portal -> View Config
 
 ```sh
 set DEV_MODE=true
+set ENABLE_HTTPS=false
 set BUS_CLIENT_ID=<get from gcp console...>
 set BUS_URL="https://dev-sandbox123-bus.social-surveys.gcp.onsdigital.uk"
 set CATI_URL="https://dev-sandbox123-cati.social-surveys.gcp.onsdigital.uk"

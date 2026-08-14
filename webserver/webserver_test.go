@@ -274,12 +274,17 @@ func TestRegisterUtilityRoutesLanguageAndNoRoute(t *testing.T) {
 		name       string
 		method     string
 		path       string
+		host       string
+		referer    string
 		wantStatus int
 		wantLoc    string
 	}{
 		{name: "welsh language", method: http.MethodPost, path: "/language/welsh", wantStatus: http.StatusOK},
 		{name: "english language", method: http.MethodPost, path: "/language/english", wantStatus: http.StatusOK},
 		{name: "welsh language fallback via get", method: http.MethodGet, path: "/language/welsh", wantStatus: http.StatusSeeOther, wantLoc: "/"},
+		{name: "welsh language redirect via same host referer", method: http.MethodGet, path: "/language/welsh", host: "portal.test", referer: "https://portal.test/instruments?lang=cy", wantStatus: http.StatusSeeOther, wantLoc: "/instruments?lang=cy"},
+		{name: "welsh language rejects scheme-relative target", method: http.MethodGet, path: "/language/welsh", host: "portal.test", referer: "https://portal.test//evil.example?lang=cy", wantStatus: http.StatusSeeOther, wantLoc: "/"},
+		{name: "welsh language rejects cross-host referer", method: http.MethodGet, path: "/language/welsh", host: "portal.test", referer: "https://evil.example/instruments?lang=cy", wantStatus: http.StatusSeeOther, wantLoc: "/"},
 	}
 
 	for _, tt := range tests {
@@ -288,6 +293,12 @@ func TestRegisterUtilityRoutesLanguageAndNoRoute(t *testing.T) {
 			req, err := http.NewRequest(tt.method, tt.path, nil)
 			if err != nil {
 				t.Fatalf("http.NewRequest() error: %v", err)
+			}
+			if tt.host != "" {
+				req.Host = tt.host
+			}
+			if tt.referer != "" {
+				req.Header.Set("Referer", tt.referer)
 			}
 			router.ServeHTTP(recorder, req)
 
@@ -303,11 +314,11 @@ func TestRegisterUtilityRoutesLanguageAndNoRoute(t *testing.T) {
 		})
 	}
 
-	if len(languageManager.setCalls) != 3 {
-		t.Fatalf("SetWelsh call count = %d, want 3", len(languageManager.setCalls))
+	if len(languageManager.setCalls) != len(tests) {
+		t.Fatalf("SetWelsh call count = %d, want %d", len(languageManager.setCalls), len(tests))
 	}
-	if languageManager.setCalls[0] != true || languageManager.setCalls[1] != false || languageManager.setCalls[2] != true {
-		t.Fatalf("SetWelsh calls = %v, want [true false true]", languageManager.setCalls)
+	if languageManager.setCalls[0] != true || languageManager.setCalls[1] != false || languageManager.setCalls[2] != true || languageManager.setCalls[3] != true || languageManager.setCalls[4] != true || languageManager.setCalls[5] != true {
+		t.Fatalf("SetWelsh calls = %v, want [true false true true true true]", languageManager.setCalls)
 	}
 
 	recorder := httptest.NewRecorder()
@@ -330,6 +341,39 @@ func TestNewHTTPClientUsesConfiguredTimeout(t *testing.T) {
 
 	if client.Timeout != httpClientTimeout {
 		t.Fatalf("client.Timeout = %v, want %v", client.Timeout, httpClientTimeout)
+	}
+}
+
+func TestShouldUseSecureCookies(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *Config
+		want   bool
+	}{
+		{
+			name:   "uses secure cookies outside dev mode",
+			config: &Config{DevMode: false, EnableHTTPS: false},
+			want:   true,
+		},
+		{
+			name:   "disables secure cookies in dev mode over http",
+			config: &Config{DevMode: true, EnableHTTPS: false},
+			want:   false,
+		},
+		{
+			name:   "keeps secure cookies in dev mode when https enabled",
+			config: &Config{DevMode: true, EnableHTTPS: true},
+			want:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := shouldUseSecureCookies(tt.config)
+			if got != tt.want {
+				t.Fatalf("shouldUseSecureCookies() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
