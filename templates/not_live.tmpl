@@ -5,41 +5,41 @@
 {{ template "head_imports" (WrapWelsh .welsh) }}
 </head>
 <body>
-<div class="page">
-    <div class="page__content">
+<div class="ons-page">
+    <div class="ons-page__content">
         {{ if .welsh}}
-            <a class="skip__link" href="#main-content">Neidio i'r prif gynnwys</a>
+            <a class="ons-skip-to-content" href="#main-content">Neidio i'r prif gynnwys</a>
         {{ else }}
-            <a class="skip__link" href="#main-content">Skip to main content</a>
+            <a class="ons-skip-to-content" href="#main-content">Skip to main content</a>
         {{ end }}
 {{ template "header" (WrapWelsh .welsh) }}
-        <div class="page__container container " style="min-height: calc(67vh)">
-            <div class="grid">
-                <div class="grid__col col-8@m">
+        <div class="ons-page__container ons-container" style="min-height: calc(67vh)">
+            <div class="ons-grid">
+                <div class="ons-grid__col ons-col-8@m">
                     {{if .welsh}}
-                        <nav class="breadcrumb" aria-label="Yn ôl">
-                            <ol class="breadcrumb__items u-fs-s">
-                                <li class="breadcrumb__item" id="breadcrumb-1">
-                                    <a class="breadcrumb__link" href="/" id="yn ôl" data-attribute="yn ôl">Yn ôl</a>
-                                    <svg class="svg-icon" viewBox="0 0 8 13" xmlns="http://www.w3.org/2000/svg" focusable="false" fill="currentColor">
+                        <nav class="ons-breadcrumbs" aria-label="Yn ôl">
+                            <ol class="ons-breadcrumbs__items ons-u-fs-s">
+                                <li class="ons-breadcrumbs__item" id="breadcrumb-1">
+                                    <a class="ons-breadcrumbs__link" href="/" id="yn ôl" data-attribute="yn ôl">Yn ôl</a>
+                                    <svg class="ons-icon" viewBox="0 0 8 13" xmlns="http://www.w3.org/2000/svg" focusable="false" fill="currentColor">
                                         <path d="M5.74,14.28l-.57-.56a.5.5,0,0,1,0-.71h0l5-5-5-5a.5.5,0,0,1,0-.71h0l.57-.56a.5.5,0,0,1,.71,0h0l5.93,5.93a.5.5,0,0,1,0,.7L6.45,14.28a.5.5,0,0,1-.71,0Z" transform="translate(-5.02 -1.59)" />
                                     </svg>
                                 </li>
                             </ol>
                         </nav>
                     {{else}}
-                        <nav class="breadcrumb" aria-label="Back">
-                            <ol class="breadcrumb__items u-fs-s">
-                                <li class="breadcrumb__item" id="breadcrumb-1">
-                                    <a class="breadcrumb__link" href="/" id="back" data-attribute="back">Back</a>
-                                    <svg class="svg-icon" viewBox="0 0 8 13" xmlns="http://www.w3.org/2000/svg" focusable="false" fill="currentColor">
+                        <nav class="ons-breadcrumbs" aria-label="Back">
+                            <ol class="ons-breadcrumbs__items ons-u-fs-s">
+                                <li class="ons-breadcrumbs__item" id="breadcrumb-1">
+                                    <a class="ons-breadcrumbs__link" href="/" id="back" data-attribute="back">Back</a>
+                                    <svg class="ons-icon" viewBox="0 0 8 13" xmlns="http://www.w3.org/2000/svg" focusable="false" fill="currentColor">
                                         <path d="M5.74,14.28l-.57-.56a.5.5,0,0,1,0-.71h0l5-5-5-5a.5.5,0,0,1,0-.71h0l.57-.56a.5.5,0,0,1,.71,0h0l5.93,5.93a.5.5,0,0,1,0,.7L6.45,14.28a.5.5,0,0,1-.71,0Z" transform="translate(-5.02 -1.59)" />
                                     </svg>
                                 </li>
                             </ol>
                         </nav>
                     {{end}}
-                    <main id="page-main-content" class="page__main ">
+                    <main id="page-main-content" class="ons-page__main">
                         {{if .welsh}}
                             <h1>Nid yw'r astudiaeth ar gael ar hyn o bryd</h1>
                             <p>Rhowch gynnig arall arni yn nes ymlaen neu ffoniwch ein Llinell Ymholiadau Arolwg ar 0800 085 7376 i gael help.</p>
