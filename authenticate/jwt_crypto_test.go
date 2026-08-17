@@ -1,66 +1,112 @@
 package authenticate_test
 
 import (
+	"testing"
 	"time"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
 	"github.com/ONSdigital/blaise-cawi-portal/busapi"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("JWTCrypto", func() {
-	var jwtCrypto *authenticate.JWTCrypto
+func TestJWTCryptoEncryptJWT(t *testing.T) {
+	jwtCrypto := &authenticate.JWTCrypto{JWTSecret: "test-secret"}
 
-	BeforeEach(func() {
-		jwtCrypto = &authenticate.JWTCrypto{JWTSecret: "test-secret"}
-	})
-
-	It("sets expiry to roughly authTimeout minutes", func() {
+	t.Run("sets expiry to roughly authTimeout minutes", func(t *testing.T) {
 		authTimeout := 7
 		before := time.Now()
 		tolerance := 2 * time.Second
 
-		token, err := jwtCrypto.EncryptJWT("123456789012", &busapi.UacInfo{
+		token, err := jwtCrypto.EncryptJWT("123456789012", &busapi.UACInfo{
 			InstrumentName: "foo",
 			CaseID:         "bar",
 		}, authTimeout)
-		Expect(err).To(BeNil())
+		if err != nil {
+			t.Fatalf("EncryptJWT() error: %v", err)
+		}
 
 		claims, err := jwtCrypto.DecryptJWT(token)
-		Expect(err).To(BeNil())
-		Expect(claims).ToNot(BeNil())
+		if err != nil {
+			t.Fatalf("DecryptJWT() error: %v", err)
+		}
+		if claims == nil {
+			t.Fatal("DecryptJWT() claims is nil")
+		}
 
 		after := time.Now()
 		expiresAt := claims.ExpiresAt.Time
-
-		Expect(expiresAt).To(BeTemporally(">=", before.Add(time.Duration(authTimeout)*time.Minute-tolerance)))
-		Expect(expiresAt).To(BeTemporally("<=", after.Add(time.Duration(authTimeout)*time.Minute+tolerance)))
-		Expect(claims.Issuer).To(Equal(authenticate.ISSUER))
+		min := before.Add(time.Duration(authTimeout)*time.Minute - tolerance)
+		max := after.Add(time.Duration(authTimeout)*time.Minute + tolerance)
+		if expiresAt.Before(min) || expiresAt.After(max) {
+			t.Fatalf("expiresAt %v out of range [%v, %v]", expiresAt, min, max)
+		}
+		if claims.Issuer != authenticate.ISSUER {
+			t.Fatalf("Issuer = %q, want %q", claims.Issuer, authenticate.ISSUER)
+		}
 	})
 
-	It("uses the default timeout when authTimeout is zero", func() {
+	t.Run("uses the default timeout when authTimeout is zero", func(t *testing.T) {
 		before := time.Now()
 		tolerance := 2 * time.Second
 
-		token, err := jwtCrypto.EncryptJWT("123456789012", &busapi.UacInfo{
+		token, err := jwtCrypto.EncryptJWT("123456789012", &busapi.UACInfo{
 			InstrumentName: "foo",
 			CaseID:         "bar",
 		}, 0)
-		Expect(err).To(BeNil())
+		if err != nil {
+			t.Fatalf("EncryptJWT() error: %v", err)
+		}
 
 		claims, err := jwtCrypto.DecryptJWT(token)
-		Expect(err).To(BeNil())
-		Expect(claims).ToNot(BeNil())
+		if err != nil {
+			t.Fatalf("DecryptJWT() error: %v", err)
+		}
+		if claims == nil {
+			t.Fatal("DecryptJWT() claims is nil")
+		}
 
 		after := time.Now()
 		expected := time.Duration(authenticate.DefaultAuthTimeout) * time.Minute
 		expiresAt := claims.ExpiresAt.Time
-
-		Expect(expiresAt).To(BeTemporally(">=", before.Add(expected-tolerance)))
-		Expect(expiresAt).To(BeTemporally("<=", after.Add(expected+tolerance)))
-		Expect(claims.AuthTimeout).To(Equal(authenticate.DefaultAuthTimeout))
-		Expect(claims.Issuer).To(Equal(authenticate.ISSUER))
+		min := before.Add(expected - tolerance)
+		max := after.Add(expected + tolerance)
+		if expiresAt.Before(min) || expiresAt.After(max) {
+			t.Fatalf("expiresAt %v out of range [%v, %v]", expiresAt, min, max)
+		}
+		if claims.AuthTimeout != authenticate.DefaultAuthTimeout {
+			t.Fatalf("AuthTimeout = %d, want %d", claims.AuthTimeout, authenticate.DefaultAuthTimeout)
+		}
+		if claims.Issuer != authenticate.ISSUER {
+			t.Fatalf("Issuer = %q, want %q", claims.Issuer, authenticate.ISSUER)
+		}
 	})
-})
+}
+
+func TestJWTCryptoDecryptJWTErrors(t *testing.T) {
+	jwtCrypto := &authenticate.JWTCrypto{JWTSecret: "test-secret"}
+
+	t.Run("returns an error when jwt token type is not a string", func(t *testing.T) {
+		claims, err := jwtCrypto.DecryptJWT(123)
+		if err == nil {
+			t.Fatal("DecryptJWT() expected error, got nil")
+		}
+		if err.Error() != "invalid JWT token type in session" {
+			t.Fatalf("error = %q, want %q", err.Error(), "invalid JWT token type in session")
+		}
+		if claims != nil {
+			t.Fatalf("claims = %+v, want nil", claims)
+		}
+	})
+
+	t.Run("returns an error when jwt token is nil", func(t *testing.T) {
+		claims, err := jwtCrypto.DecryptJWT(nil)
+		if err == nil {
+			t.Fatal("DecryptJWT() expected error, got nil")
+		}
+		if err.Error() != "no JWT token in session" {
+			t.Fatalf("error = %q, want %q", err.Error(), "no JWT token in session")
+		}
+		if claims != nil {
+			t.Fatalf("claims = %+v, want nil", claims)
+		}
+	})
+}

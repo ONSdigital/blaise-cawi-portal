@@ -8,10 +8,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-//Generate mocks by running "go generate ./..."
-//go:generate mockery --name JWTCryptoInterface
+//go:generate mockery
 type JWTCryptoInterface interface {
-	EncryptJWT(string, *busapi.UacInfo, int) (string, error)
+	EncryptJWT(string, *busapi.UACInfo, int) (string, error)
 	DecryptJWT(interface{}) (*UACClaims, error)
 }
 
@@ -21,7 +20,7 @@ type JWTCrypto struct {
 
 var DefaultAuthTimeout = 15
 
-func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UacInfo, authTimeout int) (string, error) {
+func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UACInfo, authTimeout int) (string, error) {
 	if authTimeout == 0 {
 		authTimeout = DefaultAuthTimeout
 	}
@@ -29,7 +28,7 @@ func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UacInfo, auth
 	claims := UACClaims{
 		UAC:         uac,
 		AuthTimeout: authTimeout,
-		UacInfo: busapi.UacInfo{
+		UACInfo: busapi.UACInfo{
 			InstrumentName: uacInfo.InstrumentName,
 			CaseID:         uacInfo.CaseID,
 		},
@@ -45,9 +44,14 @@ func (jwtCrypto *JWTCrypto) EncryptJWT(uac string, uacInfo *busapi.UacInfo, auth
 
 func (jwtCrypto *JWTCrypto) DecryptJWT(jwtToken interface{}) (*UACClaims, error) {
 	if jwtToken == nil {
-		return nil, fmt.Errorf("no JWT Token in session")
+		return nil, fmt.Errorf("no JWT token in session")
 	}
-	token, err := jwt.ParseWithClaims(jwtToken.(string), &UACClaims{}, func(token *jwt.Token) (interface{}, error) {
+	jwtTokenString, ok := jwtToken.(string)
+	if !ok || jwtTokenString == "" {
+		return nil, fmt.Errorf("invalid JWT token type in session")
+	}
+
+	token, err := jwt.ParseWithClaims(jwtTokenString, &UACClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
