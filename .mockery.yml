@@ -1,0 +1,21 @@
+template: testify
+template-data:
+  unroll-variadic: true
+dir: "{{.InterfaceDir}}/mocks"
+filename: "{{.InterfaceName}}.go"
+pkgname: mocks
+structname: "{{.InterfaceName}}"
+packages:
+  github.com/ONSdigital/blaise-cawi-portal/authenticate:
+    interfaces:
+      AuthInterface:
+      JWTCryptoInterface:
+  github.com/ONSdigital/blaise-cawi-portal/blaiserestapi:
+    interfaces:
+      BlaiseRestAPIInterface:
+  github.com/ONSdigital/blaise-cawi-portal/busapi:
+    interfaces:
+      BUSAPIInterface:
+  github.com/ONSdigital/blaise-cawi-portal/languagemanager:
+    interfaces:
+      LanguageManagerInterface:

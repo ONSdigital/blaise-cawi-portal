@@ -9,29 +9,53 @@
             ONS online studies – Office for National Statistics
       {{end}}
     </title>
-    <link rel="stylesheet" href="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/css/main.css">
-    <link rel="stylesheet" media="print" href="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/css/print.css">
+    <link rel="stylesheet" href="https://cdn.ons.gov.uk/sdc/design-system/73.10.0/css/main.css">
+    <link rel="stylesheet" media="print" href="https://cdn.ons.gov.uk/sdc/design-system/73.10.0/css/print.css">
     <meta name="theme-color" content="#206095"/>
     <!-- Favicons -->
-    <meta name="msapplication-config"
-          content="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/favicons/browserconfig.json">
-    <link rel="icon" type="image/x-icon" href="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/favicons/favicon.ico">
-    <link rel="icon" type="image/png" href="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/favicons/favicon-32x32.png"
+    <link rel="icon" type="image/x-icon" href="https://cdn.ons.gov.uk/sdc/design-system/73.10.0/favicons/favicon.ico">
+    <link rel="icon" type="image/png" href="https://cdn.ons.gov.uk/sdc/design-system/73.10.0/favicons/favicon-32x32.png"
           sizes="32x32">
-    <link rel="icon" type="image/png" href="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/favicons/favicon-16x16.png"
+    <link rel="icon" type="image/png" href="https://cdn.ons.gov.uk/sdc/design-system/73.10.0/favicons/favicon-16x16.png"
           sizes="16x16">
-    <link rel="mask-icon" href="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/favicons/safari-pinned-tab.svg"
+    <link rel="mask-icon" href="https://cdn.ons.gov.uk/sdc/design-system/73.10.0/favicons/safari-pinned-tab.svg"
           color="#000000">
     <link rel="apple-touch-icon" type="image/png"
-          href="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/favicons/apple-touch-icon.png" sizes="180x180">
-    <link rel="manifest" href="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/favicons/manifest.json">
-    <script src="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/scripts/main.js"></script>
-    <script src="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/scripts/24.js"></script>
-    <script src="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/scripts/20.js"></script>
-    <script src="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/scripts/18.js"></script>
-    <script src="https://cdn.ons.gov.uk/sdc/design-system/36.0.0/scripts/33.js"></script>
+          href="https://cdn.ons.gov.uk/sdc/design-system/73.10.0/favicons/apple-touch-icon.png" sizes="180x180">
+    <script src="https://cdn.ons.gov.uk/sdc/design-system/73.10.0/scripts/main.js"></script>
     <script src="/assets/js/language.js"></script>
     <style>
+            html, body {
+                  height: 100%;
+            }
+
+            body {
+                  min-height: 100vh;
+            }
+
+            .ons-page {
+                  min-height: 100vh;
+                  display: flex;
+                  flex-direction: column;
+            }
+
+            .ons-page__content {
+                  display: flex;
+                  flex-direction: column;
+                  flex: 1;
+            }
+
+            .ons-footer {
+                  margin-top: auto;
+            }
+
+            .uac__input {
+                  font-family: RobotoMono, monospace;
+                  font-weight: 1000;
+                  letter-spacing: 0;
+                  text-transform: uppercase;
+            }
+
         a {
             cursor: pointer;
             text-decoration: underline;

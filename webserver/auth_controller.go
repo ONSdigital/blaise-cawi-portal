@@ -5,17 +5,15 @@ import (
 	"net/http"
 
 	"github.com/ONSdigital/blaise-cawi-portal/authenticate"
+	"github.com/ONSdigital/blaise-cawi-portal/csrf"
 	"github.com/ONSdigital/blaise-cawi-portal/languagemanager"
+	"github.com/ONSdigital/blaise-cawi-portal/sessionkeys"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	csrf "github.com/srbry/gin-csrf"
-	"go.uber.org/zap"
 )
 
 type AuthController struct {
 	Auth            authenticate.AuthInterface
-	Logger          *zap.Logger
-	UacKind         string
 	CSRFManager     csrf.CSRFManager
 	LanguageManager languagemanager.LanguageManagerInterface
 }
@@ -35,7 +33,7 @@ func (authController *AuthController) AddRoutes(httpRouter *gin.Engine) {
 func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 	hasSession, claim := authController.Auth.HasSession(context)
 	if hasSession {
-		context.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/%s/", claim.UacInfo.InstrumentName))
+		context.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/%s/", claim.UACInfo.InstrumentName))
 		return
 	}
 
@@ -49,20 +47,20 @@ func (authController *AuthController) LoginEndpoint(context *gin.Context) {
 	}
 
 	context.HTML(http.StatusOK, "login.tmpl", gin.H{
-		"uac16":      authController.isUac16(),
+		"uac16":      authController.Auth.IsUAC16(),
 		"csrf_token": authController.CSRFManager.GetToken(context),
 		"welsh":      authController.LanguageManager.IsWelsh(context),
 	})
 }
 
 func (authController *AuthController) PostLoginEndpoint(context *gin.Context) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 
 	authController.Auth.Login(context, session)
 }
 
 func (authController *AuthController) LogoutEndpoint(context *gin.Context) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 
 	authController.Auth.Logout(context, session)
 }
@@ -77,22 +75,17 @@ func (authController *AuthController) LoggedInEndpoint(context *gin.Context) {
 }
 
 func (authController *AuthController) TimedOutEndpoint(context *gin.Context) {
-	session := sessions.DefaultMany(context, "user_session")
+	session := sessions.DefaultMany(context, sessionkeys.UserSessionName)
 
-	timeout := session.Get(authenticate.SESSION_TIMEOUT_KEY)
-	if timeout != nil {
-		timeout = timeout.(int)
-	}
-	if timeout == nil || timeout == 0 {
-		timeout = authenticate.DefaultAuthTimeout
+	timeout := authenticate.DefaultAuthTimeout
+	if timeoutValue := session.Get(authenticate.SESSION_TIMEOUT_KEY); timeoutValue != nil {
+		if sessionTimeout, ok := timeoutValue.(int); ok && sessionTimeout > 0 {
+			timeout = sessionTimeout
+		}
 	}
 
 	context.HTML(http.StatusOK, "timeout.tmpl", gin.H{
 		"timeout": timeout,
 		"welsh":   authController.LanguageManager.IsWelsh(context),
 	})
-}
-
-func (authController *AuthController) isUac16() bool {
-	return authController.UacKind == "uac16"
 }

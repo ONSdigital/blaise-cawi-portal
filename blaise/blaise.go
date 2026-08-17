@@ -3,9 +3,9 @@ package blaise
 import "net/url"
 
 type LaunchBlaise struct {
-	KeyValue  string `json:"KeyValue"`
-	Mode      string `json:"Mode"`
-	Language  string `json:"Language,omitempty"`
+	KeyValue string `json:"KeyValue"`
+	Mode     string `json:"Mode"`
+	Language string `json:"Language,omitempty"`
 }
 
 type StartInterview struct {
@@ -18,16 +18,16 @@ func CasePayload(caseID string, welsh bool) LaunchBlaise {
 		language = "WLS"
 	}
 	return LaunchBlaise{
-		KeyValue:  caseID,
-		Mode:      "CAWI",
-		Language:  language,
+		KeyValue: caseID,
+		Mode:     "CAWI",
+		Language: language,
 	}
 }
 
 func (blaise LaunchBlaise) Form() url.Values {
 	formValues := url.Values{
-		"KeyValue":  {blaise.KeyValue},
-		"Mode":      {blaise.Mode},
+		"KeyValue": {blaise.KeyValue},
+		"Mode":     {blaise.Mode},
 	}
 	if blaise.Language != "" {
 		formValues["Language"] = []string{blaise.Language}

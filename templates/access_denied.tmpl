@@ -5,14 +5,14 @@
 {{ template "head_imports" (WrapWelsh .welsh) }}
 </head>
 <body>
-<div class="page">
-    <div class="page__content">
-        <a class="skip__link" href="#main-content">Skip to main content</a>
+<div class="ons-page">
+    <div class="ons-page__content">
+        <a class="ons-skip-to-content" href="#main-content">Skip to main content</a>
         {{ template "header" (WrapWelsh .welsh) }}
-        <div class="page__container container " style="min-height: calc(67vh)">
-            <div class="grid">
-                <div class="grid__col col-8@m">
-                    <main id="main-content" class="page__main ">
+        <div class="ons-page__container ons-container" style="min-height: calc(67vh)">
+            <div class="ons-grid">
+                <div class="ons-grid__col ons-col-8@m">
+                    <main id="main-content" class="ons-page__main">
                         {{if .welsh}}
                             <h1>Mae'n ddrwg gennym, mae problem gyda'r gwasanaeth</h1>
                             <p>I fynd i'r dudalen hon, bydd angen i chi .<a href="/">roi eich cod mynediad eto</a>.</p>

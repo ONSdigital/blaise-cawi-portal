@@ -1,14 +1,12 @@
 package languagemanager
 
 import (
-	"fmt"
-
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
-//Generate mocks by running "go generate ./..."
-//go:generate mockery --name LanguageManagerInterface
+//go:generate mockery
 type LanguageManagerInterface interface {
 	IsWelsh(*gin.Context) bool
 	SetWelsh(*gin.Context, bool)
@@ -17,6 +15,14 @@ type LanguageManagerInterface interface {
 
 type Manager struct {
 	SessionName string
+	Logger      *zap.Logger
+}
+
+func (manager *Manager) logger() *zap.Logger {
+	if manager.Logger != nil {
+		return manager.Logger
+	}
+	return zap.L()
 }
 
 func (manager *Manager) IsWelsh(context *gin.Context) bool {
@@ -33,7 +39,7 @@ func (manager *Manager) SetWelsh(context *gin.Context, welsh bool) {
 	session.Set("welsh", welsh)
 	err := session.Save()
 	if err != nil {
-		fmt.Printf("Error saving session: %s\n", err)
+		manager.logger().Error("Failed to save language session", zap.Error(err))
 	}
 }
 

@@ -1,5 +1,3 @@
-coverage.out
-/.idea/
+.idea/
+.vscode/
 *.json
-app.yaml
-.DS_Store
